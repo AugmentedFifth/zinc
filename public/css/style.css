@@ -1,0 +1,25 @@
+html {
+    height: 100%;
+}
+
+body {
+    height: 100%;
+    padding: 0;
+    margin: 0;
+    background-image: url("/img/dotted-square-pattern.png");
+    background-repeat: repeat;
+    background-position: left top;
+}
+
+canvas {
+    border: 1px solid #000;
+    width: calc(100% - 10px);
+    max-width: 1280px;
+    max-height: calc(100% - 10px);
+}
+
+.center-flex {
+    align-items: center;
+    display: flex;
+    justify-content: center;
+}

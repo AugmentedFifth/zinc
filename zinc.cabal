@@ -1,0 +1,33 @@
+name:               zinc
+version:            0.1.0
+-- synopsis:
+-- description:
+homepage:           https://www.github.com/AugmentedFifth/zinc#readme
+license:            AGPL-3
+license-file:       LICENSE
+author:             Zachary Comito
+maintainer:         zcomito@gmail.com
+copyright:          2017 Zachary Comito
+category:           Web
+build-type:         Simple
+extra-source-files: README.md
+cabal-version:      >= 1.10
+
+executable zinc
+  hs-source-dirs:     server
+  main-is:            Main.hs
+  ghc-options:        -fprint-unicode-syntax -Wall -O2 -threaded -rtsopts
+                      "-with-rtsopts=-N" -fwarn-tabs -funbox-strict-fields
+
+  build-depends:      base          >= 4.7   && < 5
+                    , bytestring    >= 0.9.1 && < 0.11
+                    , containers
+                    , monad-control >= 1.0   && < 1.1
+                    , mtl           >= 2     && < 3
+                    , snap-core     >= 1.0   && < 1.1
+                    , snap-server   >= 1.0   && < 1.1
+                    , uuid
+                    , websockets
+                    , websockets-snap
+
+  default-language:   Haskell2010

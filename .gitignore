@@ -1,0 +1,36 @@
+# Haskell stuff
+dist
+dist-*
+cabal-dev
+*.o
+*.hi
+*.chi
+*.chs.h
+*.dyn_o
+*.dyn_hi
+.hpc
+.hsenv
+.cabal-sandbox/
+cabal.sandbox.config
+*.prof
+*.aux
+*.hp
+*.eventlog
+.stack-work/
+cabal.project.local
+.HTF/
+
+# Snap
+log/
+
+# Other
+null/
+*.tar
+*.xz
+*.bz
+*.bz2
+*.gz
+*.tgz
+*.zip
+*.7z
+*.rar
