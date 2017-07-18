@@ -118,7 +118,7 @@ window.addEventListener("load", () => {
         ctx.restore();
 
         // Draw centering lines for debugging.
-        // /*
+        /*
         ctx.save();
         ctx.lineWidth = 2;
         ctx.strokeStyle = "rgba(144, 44, 44, 0.75)";
@@ -130,7 +130,7 @@ window.addEventListener("load", () => {
         ctx.lineTo(Main.width, Main.height / 2);
         ctx.stroke();
         ctx.restore();
-        // */
+        */
 
         // Draw title text.
         ctx.save();
@@ -146,8 +146,8 @@ window.addEventListener("load", () => {
         // Draw mouse trails.
         ctx.save();
         ctx.lineWidth = 2;
-        ctx.lineCap = "butt";
-        ctx.lineJoin = "bevel";
+        //ctx.lineCap = "butt";
+        //ctx.lineJoin = "miter";
         const oldestMouseLoc = mouseLocs.peek();
         let [oldX, oldY] =
             oldestMouseLoc ?
