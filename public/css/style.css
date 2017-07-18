@@ -13,9 +13,10 @@ body {
 
 canvas {
     border: 1px solid rgba(0, 0, 0, 0.5);
-    width: calc(100% - 10px);
+    min-width: 1280px;
     max-width: 1280px;
-    max-height: calc(100% - 10px);
+    min-height: 720px;
+    max-height: 720px;
     z-index: 1001;
 }
 

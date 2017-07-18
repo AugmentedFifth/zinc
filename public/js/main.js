@@ -4,6 +4,13 @@ const Main = {
     width: 1280,
     height: 720,
     sparkGravity: 0.005,
+    isInCanvas: pos => {
+        "use strict";
+        return pos.x >= 0 &&
+               pos.y >= 0 &&
+               pos.x <= Main.width &&
+               pos.y <= Main.width;
+    },
     noSupportFailure: (htmlName, plainName) => {
         "use strict";
 
@@ -213,10 +220,12 @@ window.addEventListener("load", () => {
 
         // Update state of mouse particles.
         mouseSparks.map(([pos, vel, age, green]) => {
-            const newAge = age + dt;
             const newVel = vel.add(v2(0, Main.sparkGravity * dt));
-            const newPos = pos.add(vel.scalarMult(dt));
-            return [newPos, newVel, newAge, green];
+            const newPos = pos.add(newVel.scalarMult(dt));
+            if (!Main.isInCanvas(newPos)) {
+                return null;
+            }
+            return [newPos, newVel, age + dt, green];
         });
 
         // Restore all.
