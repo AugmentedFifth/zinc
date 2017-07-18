@@ -1,5 +1,8 @@
 const Main = {
     doLoop: true,
+    lastLoop: 0,
+    width: 1280,
+    height: 720,
     noSupportFailure: (htmlName, plainName) => {
         "use strict";
 
@@ -14,7 +17,7 @@ const Main = {
             "Uh oh! It looks like your browser doesn't support " +
                 `${plainName}. You can download Firefox for free here: ` +
                 "https://www.mozilla.org/en-US/firefox/new/";
-        throw Error(noSupportMsg);
+        throw new Error(noSupportMsg);
     }
 };
 
@@ -62,7 +65,7 @@ window.addEventListener("load", () => {
                     "UUID expected size (in bytes): 16, " +
                         `got: ${Main.uuid.byteLength}`;
                 ws.close(4002, errMsg);
-                throw Error(errMsg);
+                throw new Error(errMsg);
             }
         }
     });
@@ -72,16 +75,68 @@ window.addEventListener("load", () => {
         console.log(err.target.url, err.target.readyState);
     });
 
-    // Main game loop.
-    function main(timestamp) {
+    // Set up constants that will be used in main menu draw loop.
+    const darkBg = document.getElementById("45-deg-dark-jean-pattern");
+    const darkBgPattern = ctx.createPattern(darkBg, "repeat");
+
+    const textBg = document.getElementById("pink-dust-pattern");
+    const textBgPattern = ctx.createPattern(textBg, "repeat");
+
+    // Main menu loop.
+    function mainMenu(timestamp) {
+        // Request next animation frame right up front.
         if (Main.doLoop) {
-            requestAnimationFrame(main);
+            requestAnimationFrame(mainMenu);
         }
 
-        //
+        // Update our dt for this frame.
+        const dt = Main.lastLoop ? timestamp - Main.lastLoop : 0;
+        Main.lastLoop = timestamp;
+
+        // Clear canvas.
+        ctx.moveTo(0, 0);
+        ctx.clearRect(0, 0, Main.width, Main.height);
+
+        // Save state.
+        ctx.save();
+
+        // Fill in the background.
+        ctx.save();
+        ctx.fillStyle = darkBgPattern;
+        ctx.fillRect(0, 0, Main.width, Main.height);
+        ctx.restore();
+
+        // Draw centering lines for debugging.
+        // /*
+        ctx.save();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "rgba(144, 44, 44, 0.75)";
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(Main.width / 2, 0);
+        ctx.lineTo(Main.width / 2, Main.height);
+        ctx.moveTo(0, Main.height / 2);
+        ctx.lineTo(Main.width, Main.height / 2);
+        ctx.stroke();
+        ctx.restore();
+        // */
+
+        // Draw title text.
+        ctx.save();
+        ctx.font = "192px 'Noto Sans', sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillStyle = textBgPattern;
+        ctx.fillText("zinc", Main.width / 2, 175);
+        ctx.strokeStyle = "rgba(144, 144, 144, 0.5)";
+        ctx.lineWidth = 2;
+        ctx.strokeText("zinc", Main.width / 2, 175);
+        ctx.restore();
+
+        // Restore all.
+        ctx.restore();
     }
 
     // Start main game loop.
-    //requestAnimationFrame(main);
+    requestAnimationFrame(mainMenu);
     console.log("loaderino");
 });
