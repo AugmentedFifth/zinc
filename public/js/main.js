@@ -82,6 +82,16 @@ window.addEventListener("load", () => {
     const textBg = document.getElementById("pink-dust-pattern");
     const textBgPattern = ctx.createPattern(textBg, "repeat");
 
+    // Circular buffer to store mouse position history.
+    const mouseLocs = new CircularBuffer(192);
+    canvas.addEventListener(
+        "mousemove",
+        e => {
+            const rect = canvas.getBoundingClientRect();
+            mouseLocs.cons(v2(e.clientX - rect.left, e.clientY - rect.top));
+        }
+    );
+
     // Main menu loop.
     function mainMenu(timestamp) {
         // Request next animation frame right up front.
@@ -130,6 +140,41 @@ window.addEventListener("load", () => {
         ctx.strokeStyle = "rgba(144, 144, 144, 0.5)";
         ctx.lineWidth = 2;
         ctx.strokeText("zinc", Main.width / 2, 175);
+        ctx.restore();
+
+        // Draw mouse trails.
+        ctx.save();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "rgba(144, 144, 144, 0.5)";
+        const oldestMouseLoc = mouseLocs.peek();
+        let [oldX, oldY] =
+            oldestMouseLoc ?
+                [oldestMouseLoc.x, oldestMouseLoc.y] :
+                [0, 0];
+        let mouseLocCounter = 0;
+        mouseLocs.forEachTail(
+            loc => {
+                if (mouseLocCounter > 21) {
+                    ctx.beginPath();
+                    ctx.moveTo(oldX, oldY);
+                    ctx.lineTo(loc.x, loc.y);
+                    ctx.closePath();
+                    ctx.stroke();
+                    [oldX, oldY] = [loc.x, loc.y];
+                    mouseLocCounter = 0;
+                    return;
+                }
+                mouseLocCounter++;
+            }
+        );
+        ctx.beginPath();
+        ctx.moveTo(oldX, oldY);
+        const newestMouseLoc = mouseLocs.get();
+        if (newestMouseLoc) {
+            ctx.lineTo(newestMouseLoc.x, newestMouseLoc.y);
+        }
+        ctx.closePath();
+        ctx.stroke();
         ctx.restore();
 
         // Restore all.

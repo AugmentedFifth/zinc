@@ -1,4 +1,18 @@
 /**
+ * Custom implementation of `Array.prototype.toString()`.
+ *
+ * @return {string}
+ */
+Array.prototype.toString = function() {
+    "use strict";
+    return `[${this.join(", ")}]`;
+};
+
+
+/* ================| Circular buffer implementation |================ */
+
+
+/**
  * Creates a new `CircularBuffer` with the specified `capacity`,
  * which must strictly be a positive integer.
  *
@@ -505,6 +519,50 @@ CircularBuffer.prototype.asTypedArray = function(type=Float64Array) {
 
 })();
 
+/**
+ * Executes the provided function for each element from the tail to the head.
+ *
+ * @param {function} f
+ * @return {void}
+ */
+CircularBuffer.prototype.forEachTail = function(f) {
+    "use strict";
+    const zeroElement = this.isArray ? null : 0;
+    if (this.head === this.tail && this.peek() === zeroElement) {
+        return;
+    }
+    let i = this.tail;
+    for (; i !== this._clamp_index(this.head - 1); i = (i + 1) % this.capacity) {
+        f(this._buffer[i]);
+    }
+};
+
+/**
+ * Executes the provided function for each element from the head to the tail.
+ *
+ * @param {function} f
+ * @return {void}
+ */
+CircularBuffer.prototype.forEachHead = function(f) {
+    "use strict";
+    let i = this.head - 1;
+    for (; i !== this.tail; i = i === 0 ? this.capacity - 1 : i - 1) {
+        f(this._buffer[i]);
+    }
+};
+
+/**
+ * Executes the provided function for each element from the beginning to the
+ * end of the underlying buffer.
+ *
+ * @param {function} f
+ * @return {void}
+ */
+CircularBuffer.prototype.forEachBuffer = function(f) {
+    "use strict";
+    this._buffer.forEach(f);
+};
+
 
 /* ====================| Internal functions below |==================== */
 
@@ -551,4 +609,279 @@ CircularBuffer.prototype._clamp_index = function(i) {
         return i_ + this.capacity;
     }
     return i_;
+};
+
+
+/* ===================| 2D vector implementation |=================== */
+
+
+/**
+ * Constructor for the type of 2-vectors.
+ *
+ * @param {number} x - The x entry of the vector.
+ * @param {number} y - The y entry of the vector.
+ * @return {V2} - A new 2-vector with the supplied entries.
+ */
+function V2(x, y) {
+    "use strict";
+    this.x = x;
+    this.y = y;
+}
+
+/**
+ * Error tolerance when checking for equality concerning vectors.
+ */
+V2.epsilon = 1e-12;
+
+/**
+ * Convenience method for making a new vector.
+ *
+ * @param {number} x - The x entry of the vector.
+ * @param {number} y - The y entry of the vector.
+ * @return {V2} - A new 2-vector with the supplied entries.
+ */
+function v2(x, y) {
+    "use strict";
+    return new V2(x, y);
+}
+
+/**
+ * Returns a clone of this vector.
+ *
+ * @return {V2} - A new 2-vector with the same entries as this one.
+ */
+V2.prototype.clone = function() {
+    "use strict";
+    return new V2(this.x, this.y);
+};
+
+/**
+ * Returns an `Array` representation of this vector; an `Array` of
+ * length exactly 2.
+ *
+ * @return {number[]} - An `Array` of two elements representing this vector.
+ */
+V2.prototype.array = function() {
+    "use strict";
+    return [this.x, this.y];
+};
+
+/**
+ * Makes a `V2` out of the first two elements of an `Array`.
+ *
+ * @param {number[]} - The `Array` to make a `V2` from.
+ * @return {V2} - The new vector.
+ */
+V2.fromArray = function(array) {
+    "use strict";
+    return new V2(array[0], array[1]);
+};
+
+/**
+ * Returns the zero vector.
+ *
+ * @return {V2} - The zero vector.
+ */
+V2.zero = function() {
+    "use strict";
+    return new V2(0, 0);
+};
+
+/**
+ * Compares two vectors to see if they are the same, within an error of
+ * `V2.epsilon`.
+ *
+ * @param {V2} v - The vector to compare to.
+ * @return {boolean} - Are they equal?
+ */
+V2.prototype.equals = function(v) {
+    "use strict";
+    return Math.abs(this.x - v.x) < V2.epsilon &&
+           Math.abs(this.y - v.y) < V2.epsilon;
+};
+
+/**
+ * Is this the null vector?
+ *
+ * @return {boolean} - Is this the null vector?
+ */
+V2.prototype.null = function() {
+    "use strict";
+    return Math.abs(this.x) < V2.epsilon && Math.abs(this.y) < V2.epsilon;
+};
+
+/**
+ * Adds two 2-vectors.
+ *
+ * @param {V2} v - The vector to be added to this one.
+ * @return {V2} - A new vector representing the sum.
+ */
+V2.prototype.add = function(v) {
+    "use strict";
+    return new V2(this.x + v.x, this.y + v.y);
+};
+
+/**
+ * Subtracts the supplied vector from this vector, returning the new resulting
+ * `V2`.
+ *
+ * @param {V2} v - The vector to be subtracted from this one.
+ * @return {V2} - A new vector representing the difference.
+ */
+V2.prototype.sub = function(v) {
+    "use strict";
+    return new V2(this.x - v.x, this.y - v.y);
+};
+
+/**
+ * Multiplies the supplied scalar by this vector, returning a new `V2` as the
+ * result.
+ *
+ * @param {number} k - The scalar to be multiplied to this one.
+ * @return {V2} - A new vector representing the scaled version of this vector.
+ */
+V2.prototype.scalarMult = function(k) {
+    "use strict";
+    return new V2(k * this.x, k * this.y);
+};
+
+/**
+ * Divides this vector by the supplied scalar, returning a new `V2` as the
+ * result.
+ *
+ * @param {number} k - The scalar to divide this vector by.
+ * @return {V2} - A new vector representing the scaled version of this vector.
+ */
+V2.prototype.scalarDiv = function(k) {
+    "use strict";
+    return new V2(this.x / k, this.y / k);
+};
+
+/**
+ * Dots this vector by the supplied vector, returning a new `V2` as the result.
+ *
+ * @param {V2} v - The vector to dot this vector by.
+ * @return {number} - A scalar representing the dot product.
+ */
+V2.prototype.dot = function(v) {
+    "use strict";
+    return this.x * v.x + this.y * v.y;
+};
+
+/**
+ * The euclidian norm.
+ *
+ * @return {number} - The euclidian norm.
+ */
+V2.prototype.norm = function() {
+    "use strict";
+    return Math.sqrt(this.x * this.x + this.y + this.y);
+};
+
+/**
+ * The quadrance.
+ *
+ * @return {number} - The quadrance.
+ */
+V2.prototype.quadrance = function() {
+    "use strict";
+    return this.x * this.x + this.y + this.y;
+};
+
+/**
+ * Returns a new `V2` representing the closest perpendicular vector (with the
+ * same norm) to this one, going anticlockwise.
+ *
+ * @return {V2} - The nearest same-norm perpendicular vector.
+ */
+V2.prototype.perp = function() {
+    "use strict";
+    return new V2(-this.y, this.x);
+};
+
+/**
+ * Returns a unit-norm `V2` that is `theta` away from the positive x-axis,
+ * anticlockwise.
+ *
+ * `theta` is in radians.
+ *
+ * @param {number} theta - The angle, in radians.
+ * @return {V2} - The corresponding vector on the unit circle.
+ */
+V2.fromAngle = function(theta) {
+    "use strict";
+    return new V2(Math.cos(theta), Math.sin(theta));
+};
+
+/**
+ * The z-component of the cross product of this vector with the supplied vector
+ * in the xy-plane.
+ *
+ * @param {V2} v - The other vector to cross with.
+ * @return {number} - The z-component of the cross product.
+ */
+V2.prototype.crossZ = function(v) {
+    "use strict";
+    return this.x * v.y - this.y * v.x;
+};
+
+/**
+ * The distance between vectors in metric space.
+ *
+ * @param {V2} v - The other vector to get the distance to.
+ * @return {number} - The distance between that vector and this one.
+ */
+V2.prototype.dist = function(v) {
+    "use strict";
+    return this.sub(v).norm();
+};
+
+/**
+ * Gets the unit vector that is pointing in the same direction as this one.
+ * Does nothing to zero vectors.
+ *
+ * @return {V2} - A unit vector, or zero vector if this vector is zero.
+ */
+V2.prototype.normalize = function() {
+    "use strict";
+    const norm = this.norm();
+    const quad = this.quadrance();
+    if (Math.abs(quad) <= V2.epsilon || Math.abs(quad - 1) <= V2.epsilon) {
+        return this.clone();
+    }
+    return new V2(this.x / norm, this.y / norm);
+};
+
+/**
+ * Gets the projection of a vector onto this one.
+ *
+ * @param {V2} v - The vector to project onto this one.
+ * @return {V2} - The resulting projection vector.
+ */
+V2.prototype.project = function(v) {
+    "use strict";
+    return this.scalarMult(this.dot(v) / this.quadrance());
+};
+
+/**
+ * Gets the angle of this vector from the positive x-axis, anticlockwise.
+ *
+ * Result is in radians and is always between `-pi` and `pi`.
+ *
+ * @return {number} - The angle of this vector, in radians.
+ */
+V2.prototype.angle = function() {
+    "use strict";
+    return Math.acos(this.x / this.norm()) * Math.sign(this.y);
+};
+
+/**
+ * Maps a function over both elements of this vector, returning a new `V2`.
+ *
+ * @param {function} f - The mapping function.
+ * @return {V2} - A new, mapped vector.
+ */
+V2.prototype.map = function(f) {
+    "use strict";
+    return new V2(f(this.x), f(this.y));
 };
