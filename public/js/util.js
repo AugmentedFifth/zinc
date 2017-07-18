@@ -402,9 +402,11 @@ CircularBuffer.prototype.bufferDelete = function(i) {
 };
 
 /**
- * Clears the entire underlying buffer of all its values.
+ * Clears the entire underlying buffer of all its values and resets both the
+ * `head` and `tail` cursors.
  *
- * This is equivalent to `delete`ing all elements.
+ * This is equivalent to `delete`ing all elements, and setting
+ * `head = tail = 0`.
  *
  * @return {void}
  */
@@ -414,6 +416,8 @@ CircularBuffer.prototype.clear = function() {
     for (let i = 0; i < this.capacity; ++i) {
         this._buffer[i] = zeroElement;
     }
+    this.head = 0;
+    this.tail = 0;
     this.inhabited = 0;
 };
 

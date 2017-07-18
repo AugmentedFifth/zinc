@@ -91,6 +91,7 @@ window.addEventListener("load", () => {
             mouseLocs.cons(v2(e.clientX - rect.left, e.clientY - rect.top));
         }
     );
+    canvas.addEventListener("mouseenter", () => mouseLocs.clear());
 
     // Main menu loop.
     function mainMenu(timestamp) {
@@ -145,7 +146,8 @@ window.addEventListener("load", () => {
         // Draw mouse trails.
         ctx.save();
         ctx.lineWidth = 2;
-        ctx.strokeStyle = "rgba(144, 144, 144, 0.5)";
+        ctx.lineCap = "butt";
+        ctx.lineJoin = "bevel";
         const oldestMouseLoc = mouseLocs.peek();
         let [oldX, oldY] =
             oldestMouseLoc ?
@@ -154,15 +156,15 @@ window.addEventListener("load", () => {
         let mouseLocCounter = 0;
         mouseLocs.forEachTail(
             loc => {
-                if (mouseLocCounter > 21) {
+                if (mouseLocCounter % 24 === 0) {
+                    ctx.strokeStyle =
+                        `rgba(144, 144, 144, ${mouseLocCounter / 256})`;
                     ctx.beginPath();
                     ctx.moveTo(oldX, oldY);
                     ctx.lineTo(loc.x, loc.y);
                     ctx.closePath();
                     ctx.stroke();
                     [oldX, oldY] = [loc.x, loc.y];
-                    mouseLocCounter = 0;
-                    return;
                 }
                 mouseLocCounter++;
             }
