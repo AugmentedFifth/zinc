@@ -535,8 +535,11 @@ CircularBuffer.prototype.forEachTail = function(f) {
     if (this.head === this.tail && this.peek() === zeroElement) {
         return;
     }
-    let i = this.tail;
-    for (; i !== this._clamp_index(this.head - 1); i = (i + 1) % this.capacity) {
+    for (
+        let i = this.tail;
+        i !== this._clamp_index(this.head - 1);
+        i = (i + 1) % this.capacity
+    ) {
         f(this._buffer[i]);
     }
 };
@@ -566,6 +569,41 @@ CircularBuffer.prototype.forEachBuffer = function(f) {
     "use strict";
     this._buffer.forEach(f);
 };
+
+(function() {
+"use strict";
+
+/**
+ * Maps every value in the underlying buffer to a new value based on the
+ * supplied mapping function. **This method does NOT create a new
+ * `CircularBuffer`.** It only a returns a reference to `this` to facilitate
+ * method chaining.
+ *
+ * This method takes a second, optional argument, that determines whether the
+ * mapping function operates on uninhabited spots or if it leaves them alone.
+ * The default behavior is to leave them alone.
+ *
+ * This method maps elements in the order they exist in the underlying buffer,
+ * so don't rely on the oder respecting `head` and `tail`.
+ *
+ * @template T
+ * @param {function} f - The mapping function.
+ * @param {boolean=} mapZeroes - Map uninhabited spots, or no?
+ * @return {CircularBuffer<T>} - `this`.
+ */
+CircularBuffer.prototype.map = function(f, mapZeroes=false) {
+    if (mapZeroes) {
+        this._buffer = this._buffer.map(f);
+    } else {
+        const zeroElement = this.isArray ? null : 0;
+        this._buffer = this._buffer.map(
+            elem => elem === zeroElement ? elem : f(elem)
+        );
+    }
+    return this;
+};
+
+})();
 
 
 /* ====================| Internal functions below |==================== */

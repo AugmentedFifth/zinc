@@ -140,4 +140,4 @@ site state =
 main :: IO ()
 main = do
     state <- newMVar initServerState
-    quickHttpServe $ site state
+    httpServe (setPort 3000 mempty) (site state)
