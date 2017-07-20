@@ -5,6 +5,8 @@ const Main = {
     width: 1280,
     height: 720,
     canvasRect: rect(0, 0, 1280, 720),
+    clickAnimDur: 250, // milliseconds
+    crosshairQuad: [v2(15, 0), v2(-15, 0), v2(0, 15), v2(0, -15)],
     sparkGravity: 0.005,
     transitionTime: 697.2, // milliseconds
     isInCanvas: (arg1, arg2) => {
