@@ -1025,3 +1025,23 @@ Rect.prototype.contains = function(arg1, arg2) {
            arg1.x <= this.x + this.width &&
            arg1.y <= this.y + this.height;
 };
+
+
+/* ======================| Parametric functions |====================== */
+
+
+/**
+ * Calculates one point in a one-dimensional quadratic Bezier curve.
+ *
+ * @param {number} p0 - First control point (start point).
+ * @param {number} p1 - Second control point (determines curvature).
+ * @param {number} p2 - Third control point (end point).
+ * @param {number} t - Time, where `0 <= t <= 1`.
+ * @return {number}
+ */
+function bezier2(p0, p1, p2, t) {
+    "use strict";
+    const timeComplement = 1 - t;
+    return timeComplement * (timeComplement * p0 + t * p1) +
+           t              * (timeComplement * p1 + t * p2);
+}

@@ -1,6 +1,9 @@
 Main.mainMenu = (canvas, ctx) => {
     "use strict";
 
+    // Holding a local copy of event listeners so they can be unloaded.
+    const eventListeners = new Map();
+
     // Initialize patterns.
     const darkBg = document.getElementById("45-deg-dark-jean-pattern");
     const darkBgPattern = ctx.createPattern(darkBg, "repeat");
@@ -13,43 +16,45 @@ Main.mainMenu = (canvas, ctx) => {
 
     // Circular buffer to store mouse position history.
     const mouseLocs = new CircularBuffer(168);
-    canvas.addEventListener(
-        "mousemove",
-        e => {
-            const rect = canvas.getBoundingClientRect();
-            mouseLocs.cons(v2(e.clientX - rect.left, e.clientY - rect.top));
-        }
-    );
-    canvas.addEventListener("mouseenter", () => mouseLocs.clear());
+
+    const _mousemove = e => {
+        const rect = canvas.getBoundingClientRect();
+        mouseLocs.cons(v2(e.clientX - rect.left, e.clientY - rect.top));
+    };
+    canvas.addEventListener("mousemove", _mousemove);
+    eventListeners.set("mousemove", _mousemove);
+
+    const _mouseenter = () => mouseLocs.clear();
+    canvas.addEventListener("mouseenter", _mouseenter);
+    eventListeners.set("mouseenter", _mouseenter);
 
     // Circular buffer to store mouse particle effect state.
     const mouseSparks = new CircularBuffer(64);
     let lastSparkPos = V2.zero();
 
     // Generating button data.
-    function aboutCallback() {
-        const disp = v2(Main.transitionVel, 0);
+    function aboutCallback(t=0) {
+        eventListeners.forEach(
+            (fn, type) => canvas.removeEventListener(type, fn)
+        );
+
+        const animTime = 750; // milliseconds
+        const disp = bezier2(0, 0.75, Main.width, t / animTime);
+
         if (Main.currentLoops.has("aboutPage")) {
-            const aboutOffset = Main.currentLoops.get("aboutPage").sub(disp);
-            if (aboutOffset.x <= 0) {
+            if (t >= animTime) {
                 Main.currentLoops.delete("mainMenu");
                 Main.currentLoops.set("aboutPage", V2.zero());
             } else {
-                Main.currentLoops.set(
-                    "mainMenu",
-                    Main.currentLoops.get("mainMenu").sub(disp)
-                );
-                Main.currentLoops.set("aboutPage", aboutOffset);
+                Main.currentLoops.get("mainMenu").x = -disp;
+                Main.currentLoops.get("aboutPage").x = Main.width - disp - 1;
             }
         } else {
-            Main.currentLoops.set(
-                "mainMenu",
-                Main.currentLoops.get("mainMenu").sub(disp)
-            );
-            Main.currentLoops.set("aboutPage", v2(Main.width, 0).sub(disp));
+            Main.currentLoops.get("mainMenu").x = -disp;
+            Main.currentLoops.set("aboutPage", v2(Main.width - disp, 0));
         }
         if (Main.currentLoops.has("mainMenu")) {
-            setTimeout(aboutCallback, 16.6);
+            setTimeout(() => aboutCallback(t + 16.6), 16.6);
         }
     }
     const buttons =
@@ -63,33 +68,29 @@ Main.mainMenu = (canvas, ctx) => {
     // Cursor click animation state and trigger.
     let clickAnim = null;
     const clickAnimDur = 250;
-    canvas.addEventListener(
-        "click",
-        e => {
-            const boundingRect = canvas.getBoundingClientRect();
-            const clickPos = v2(
-                e.clientX - boundingRect.left,
-                e.clientY - boundingRect.top
-            );
-            clickAnim = [clickPos, clickAnimDur];
+    const _click = e => {
+        const boundingRect = canvas.getBoundingClientRect();
+        const clickPos = v2(
+            e.clientX - boundingRect.left,
+            e.clientY - boundingRect.top
+        );
+        clickAnim = [clickPos, clickAnimDur];
 
-            if (Main.currentLoops.size !== 1) {
-                return;
-            }
-            const clickedButton = buttons.find(
-                ([box]) => box.contains(clickPos)
-            );
-            if (clickedButton) {
-                const callback = clickedButton[3];
-                console.log(1);
-                if (callback) {
-                    console.log(2);
-                    callback();
-                    console.log(3);
-                }
+        if (Main.currentLoops.size !== 1) {
+            return;
+        }
+        const clickedButton = buttons.find(
+            ([box]) => box.contains(clickPos)
+        );
+        if (clickedButton) {
+            const callback = clickedButton[3];
+            if (callback) {
+                callback();
             }
         }
-    );
+    };
+    canvas.addEventListener("click", _click);
+    eventListeners.set("click", _click);
     const crosshairQuad = [v2(15, 0), v2(-15, 0), v2(0, 15), v2(0, -15)];
 
     // Main menu loop.
