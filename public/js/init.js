@@ -6,7 +6,7 @@ const Main = {
     height: 720,
     canvasRect: rect(0, 0, 1280, 720),
     sparkGravity: 0.005,
-    transitionVel: 36,
+    transitionTime: 697.2, // milliseconds
     isInCanvas: (arg1, arg2) => {
         "use strict";
         return Main.canvasRect.contains(arg1, arg2);
@@ -81,6 +81,83 @@ Main.init = () => {
         console.log("WebSocket error:", err);
         console.log(err.target.url, err.target.readyState);
     });
+
+    /**
+     * Function for making new transition callbacks.
+     * Values for `dir`:
+     *
+     * - 0 <=> Go to a page up.
+     * - 1 <=> Right.
+     * - 2 <=> Down.
+     * - 3 <=> Left.
+     * - Anything else <=> Runtime error.
+     *
+     * @param {string} thisName - The name of the page to be transitioned from,
+     *                            as registered in `Main.currentLoops`.
+     * @param {string} destName - The name of the page to be transitioned to.
+     * @param {number} dir - Direction of the page to transition to, relative
+     *                       to the current page.
+     * @param {Map<string, function>} eventListeners - A `Map` of `EventTypes`
+     *     (`string`s) to the functions registered to those types, as
+     *     registered by the current page to the `canvas`.
+     * @return {function} - The new callback.
+     */
+    Main.getTransition = function(thisName, destName, dir, eventListeners) {
+        function transitionCallback(t=0) {
+            if (t === 0) {
+                eventListeners.forEach(
+                    (fn, type) => canvas.removeEventListener(type, fn)
+                );
+            }
+
+            const disp = bezier2(0, 0.75, Main.width, t / Main.transitionTime);
+
+            if (Main.currentLoops.has(destName)) {
+                if (t >= Main.transitionTime) {
+                    Main.currentLoops.delete(thisName);
+                    Main.currentLoops.set(destName, V2.zero());
+                } else {
+                    if (dir === 0) {
+                        Main.currentLoops.get(thisName).y = disp;
+                        Main.currentLoops.get(destName).y =
+                            -Main.width + disp + 1;
+                    } else if (dir === 1) {
+                        Main.currentLoops.get(thisName).x = -disp;
+                        Main.currentLoops.get(destName).x =
+                            Main.width - disp - 1;
+                    } else if (dir === 2) {
+                        Main.currentLoops.get(thisName).y = -disp;
+                        Main.currentLoops.get(destName).y =
+                            Main.width - disp - 1;
+                    } else if (dir === 3) {
+                        Main.currentLoops.get(thisName).x = disp;
+                        Main.currentLoops.get(destName).x =
+                            -Main.width + disp + 1;
+                    }
+                }
+            } else {
+                if (dir === 0) {
+                    Main.currentLoops.get(thisName).y = disp;
+                    Main.currentLoops.set(destName, v2(0, -Main.width + disp));
+                } else if (dir === 1) {
+                    Main.currentLoops.get(thisName).x = -disp;
+                    Main.currentLoops.set(destName, v2(Main.width - disp, 0));
+                } else if (dir === 2) {
+                    Main.currentLoops.get(thisName).y = -disp;
+                    Main.currentLoops.set(destName, v2(0, Main.width - disp));
+                } else if (dir === 3) {
+                    Main.currentLoops.get(thisName).x = disp;
+                    Main.currentLoops.set(destName, v2(-Main.width + disp, 0));
+                }
+            }
+
+            if (Main.currentLoops.has(thisName)) {
+                setTimeout(() => transitionCallback(t + 16.6), 16.6);
+            }
+        }
+
+        return transitionCallback;
+    };
 
     const registeredLoops = new Map();
 

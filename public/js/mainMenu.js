@@ -33,30 +33,13 @@ Main.mainMenu = (canvas, ctx) => {
     let lastSparkPos = V2.zero();
 
     // Generating button data.
-    function aboutCallback(t=0) {
-        eventListeners.forEach(
-            (fn, type) => canvas.removeEventListener(type, fn)
-        );
+    const aboutCallback = Main.getTransition(
+        "mainMenu",
+        "aboutPage",
+        1,
+        eventListeners
+    );
 
-        const animTime = 750; // milliseconds
-        const disp = bezier2(0, 0.75, Main.width, t / animTime);
-
-        if (Main.currentLoops.has("aboutPage")) {
-            if (t >= animTime) {
-                Main.currentLoops.delete("mainMenu");
-                Main.currentLoops.set("aboutPage", V2.zero());
-            } else {
-                Main.currentLoops.get("mainMenu").x = -disp;
-                Main.currentLoops.get("aboutPage").x = Main.width - disp - 1;
-            }
-        } else {
-            Main.currentLoops.get("mainMenu").x = -disp;
-            Main.currentLoops.set("aboutPage", v2(Main.width - disp, 0));
-        }
-        if (Main.currentLoops.has("mainMenu")) {
-            setTimeout(() => aboutCallback(t + 16.6), 16.6);
-        }
-    }
     const buttons =
         [ [rect(150, 550, 325, 100), 7, "play"]
         , [rect(805, 550, 325, 100), 7, "about", aboutCallback]
@@ -100,21 +83,6 @@ Main.mainMenu = (canvas, ctx) => {
         ctx.fillStyle = darkBgPattern;
         ctx.fillRect(0, 0, Main.width, Main.height);
         ctx.restore();
-
-        // Draw centering lines for debugging.
-        /*
-        ctx.save();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = "rgba(144, 44, 44, 0.75)";
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(Main.width / 2, 0);
-        ctx.lineTo(Main.width / 2, Main.height);
-        ctx.moveTo(0, Main.height / 2);
-        ctx.lineTo(Main.width, Main.height / 2);
-        ctx.stroke();
-        ctx.restore();
-        */
 
         // Draw title text.
         ctx.save();
