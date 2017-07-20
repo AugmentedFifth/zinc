@@ -14,9 +14,6 @@ Main.aboutPage = (canvas, ctx) => {
     const buttonBg = document.getElementById("grey-linen-pattern");
     const buttonBgPattern = ctx.createPattern(buttonBg, "repeat");
 
-    const naturalBlack = document.getElementById("natural-black-pattern");
-    const naturalBlackPattern = ctx.createPattern(naturalBlack, "repeat");
-
     // Generating button data.
     const mainCallback = Main.getTransition(
         "aboutPage",
