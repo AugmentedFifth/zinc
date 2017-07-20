@@ -26,10 +26,35 @@ Main.mainMenu = (canvas, ctx) => {
     const mouseSparks = new CircularBuffer(64);
     let lastSparkPos = V2.zero();
 
-    // Generating random screw angles and declaring positions ahead of time.
+    // Generating button data.
+    function aboutCallback() {
+        const disp = v2(Main.transitionVel, 0);
+        if (Main.currentLoops.has("aboutPage")) {
+            const aboutOffset = Main.currentLoops.get("aboutPage").sub(disp);
+            if (aboutOffset.x <= 0) {
+                Main.currentLoops.delete("mainMenu");
+                Main.currentLoops.set("aboutPage", V2.zero());
+            } else {
+                Main.currentLoops.set(
+                    "mainMenu",
+                    Main.currentLoops.get("mainMenu").sub(disp)
+                );
+                Main.currentLoops.set("aboutPage", aboutOffset);
+            }
+        } else {
+            Main.currentLoops.set(
+                "mainMenu",
+                Main.currentLoops.get("mainMenu").sub(disp)
+            );
+            Main.currentLoops.set("aboutPage", v2(Main.width, 0).sub(disp));
+        }
+        if (Main.currentLoops.has("mainMenu")) {
+            setTimeout(aboutCallback, 16.6);
+        }
+    }
     const buttons =
-        [ [v2(150, 550), v2(325, 100), 7, "play"]
-        , [v2(805, 550), v2(325, 100), 7, "about"]
+        [ [rect(150, 550, 325, 100), 7, "play"]
+        , [rect(805, 550, 325, 100), 7, "about", aboutCallback]
         ];
     const screwAngles =
         new Float64Array(buttons.length * 4)
@@ -41,11 +66,28 @@ Main.mainMenu = (canvas, ctx) => {
     canvas.addEventListener(
         "click",
         e => {
-            const rect = canvas.getBoundingClientRect();
-            clickAnim =
-                [ v2(e.clientX - rect.left, e.clientY - rect.top)
-                , clickAnimDur
-                ];
+            const boundingRect = canvas.getBoundingClientRect();
+            const clickPos = v2(
+                e.clientX - boundingRect.left,
+                e.clientY - boundingRect.top
+            );
+            clickAnim = [clickPos, clickAnimDur];
+
+            if (Main.currentLoops.size !== 1) {
+                return;
+            }
+            const clickedButton = buttons.find(
+                ([box]) => box.contains(clickPos)
+            );
+            if (clickedButton) {
+                const callback = clickedButton[3];
+                console.log(1);
+                if (callback) {
+                    console.log(2);
+                    callback();
+                    console.log(3);
+                }
+            }
         }
     );
     const crosshairQuad = [v2(15, 0), v2(-15, 0), v2(0, 15), v2(0, -15)];
@@ -88,30 +130,21 @@ Main.mainMenu = (canvas, ctx) => {
         ctx.save();
         // Grabbing roughly current mouse position; is also used further below.
         const newestMouseLoc = mouseLocs.get();
-        buttons.forEach(([bLoc, dims, screwRadius, text], i) => {
+        buttons.forEach(([box, screwRadius, text], i) => {
             // Main button body.
             ctx.fillStyle = buttonBgPattern;
             ctx.globalCompositeOperation = "luminosity";
-            ctx.fillRect(bLoc.x, bLoc.y, dims.x, dims.y);
+            ctx.fillRect(box.x, box.y, box.width, box.height);
             ctx.globalCompositeOperation = "source-over";
             ctx.lineWidth = 4;
             ctx.strokeStyle = "#202020";
-            ctx.strokeRect(bLoc.x, bLoc.y, dims.x, dims.y);
-            if (
-                newestMouseLoc &&
-                Main.rectContains(
-                    bLoc.x,
-                    bLoc.y,
-                    dims.x,
-                    dims.y,
-                    newestMouseLoc
-                )
-            ) {
+            ctx.strokeRect(box.x, box.y, box.width, box.height);
+            if (newestMouseLoc && box.contains(newestMouseLoc)) {
                 ctx.globalCompositeOperation = "darken";
                 ctx.fillStyle = "#fff";
-                ctx.fillRect(bLoc.x, bLoc.y, dims.x, dims.y);
+                ctx.fillRect(box.x, box.y, box.width, box.height);
                 ctx.strokeStyle = "#fff";
-                ctx.strokeRect(bLoc.x, bLoc.y, dims.x, dims.y);
+                ctx.strokeRect(box.x, box.y, box.width, box.height);
             }
 
             // Screws.
@@ -119,10 +152,10 @@ Main.mainMenu = (canvas, ctx) => {
             ctx.fillStyle = textBgPattern;
             ctx.lineWidth = 1;
             const screwOffset = 2 * screwRadius + 1;
-            const minX = bLoc.x + screwOffset;
-            const maxX = bLoc.x + dims.x - screwOffset;
-            const minY = bLoc.y + screwOffset;
-            const maxY = bLoc.y + dims.y - screwOffset;
+            const minX = box.x + screwOffset;
+            const maxX = box.x + box.width - screwOffset;
+            const minY = box.y + screwOffset;
+            const maxY = box.y + box.height - screwOffset;
             [ v2(minX, minY)
             , v2(minX, maxY)
             , v2(maxX, minY)
@@ -154,15 +187,15 @@ Main.mainMenu = (canvas, ctx) => {
             const yOffset = -4; // Magic number lmao
             ctx.fillText(
                 text,
-                bLoc.x + dims.x / 2,
-                bLoc.y + dims.y / 2 + yOffset
+                box.x + box.width / 2,
+                box.y + box.height / 2 + yOffset
             );
             ctx.strokeStyle = "rgba(144, 144, 144, 0.5)";
             ctx.lineWidth = 2;
             ctx.strokeText(
                 text,
-                bLoc.x + dims.x / 2,
-                bLoc.y + dims.y / 2 + yOffset
+                box.x + box.width / 2,
+                box.y + box.height / 2 + yOffset
             );
         });
         ctx.restore();

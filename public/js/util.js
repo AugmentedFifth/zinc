@@ -688,6 +688,17 @@ function v2(x, y) {
 }
 
 /**
+ * Creates a `string` representation of this `V2` and returns it, in the form
+ * "V2(`x`, `y`)".
+ *
+ * @return {string}
+ */
+V2.prototype.toString = function() {
+    "use strict";
+    return `V2(${this.x}, ${this.y})`;
+};
+
+/**
  * Returns a clone of this vector.
  *
  * @return {V2} - A new 2-vector with the same entries as this one.
@@ -926,4 +937,91 @@ V2.prototype.angle = function() {
 V2.prototype.map = function(f) {
     "use strict";
     return new V2(f(this.x), f(this.y));
+};
+
+
+/* ====================| 2D rectangle implementation |==================== */
+
+
+/**
+ * Creates a new `Rect` with the specified top-left corner, width, and height.
+ * These quantities can be specified in three different ways:
+ *
+ * - Four arguments, all `numbers`, specifying the x and y values of the
+ *   top-left corner and width/height, respectively.
+ * - Two arguments, both `V2`s.
+ * - One argument, a single `Rect` to be cloned.
+ *
+ * @param {number | V2 | Rect} arg1
+ * @param {number | V2 | void} arg2
+ * @param {number | void} arg3
+ * @param {number | void} arg4
+ * @return {Rect}
+ */
+function Rect(arg1, arg2, arg3, arg4) {
+    "use strict";
+    if (typeof arg1 === "number") {
+        this.x = arg1;
+        this.y = arg2;
+        this.width = arg3;
+        this.height = arg4;
+    } else if (arg1 instanceof V2) {
+        this.x = arg1.x;
+        this.y = arg1.y;
+        this.width = arg2.x;
+        this.height = arg2.y;
+    } else {
+        this.x = arg1.x;
+        this.y = arg1.y;
+        this.width = arg1.width;
+        this.height = arg1.height;
+    }
+}
+
+/**
+ * Convenience function for `new Rect()`.
+ *
+ * @param {number | V2 | Rect} arg1
+ * @param {number | V2 | void} arg2
+ * @param {number | void} arg3
+ * @param {number | void} arg4
+ * @return {Rect}
+ */
+function rect(arg1, arg2, arg3, arg4) {
+    "use strict";
+    return new Rect(arg1, arg2, arg3, arg4);
+}
+
+/**
+ * Returns a `string` representation of this `Rect`, in the form
+ * "Rect(`x`, `y`, `width`, `height`)".
+ *
+ * @return {string}
+ */
+Rect.prototype.toString = function() {
+    "use strict";
+    return `Rect(${this.x}, ${this.y}, ${this.width}, ${this.height})`;
+};
+
+/**
+ * Decides if this rectangle contains the given point within it.
+ *
+ * The point can be specified as two separate `number`s or just a single `V2`.
+ *
+ * @param {number | V2} arg1
+ * @param {number | void} arg2
+ * @return {boolean}
+ */
+Rect.prototype.contains = function(arg1, arg2) {
+    "use strict";
+    if (typeof arg1 === "number") {
+        return arg1 >= this.x &&
+               arg2 >= this.y &&
+               arg1 <= this.x + this.width &&
+               arg2 <= this.y + this.height;
+    }
+    return arg1.x >= this.x &&
+           arg1.y >= this.y &&
+           arg1.x <= this.x + this.width &&
+           arg1.y <= this.y + this.height;
 };

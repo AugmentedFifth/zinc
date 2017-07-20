@@ -4,17 +4,12 @@ const Main = {
     lastLoop: 0,
     width: 1280,
     height: 720,
+    canvasRect: rect(0, 0, 1280, 720),
     sparkGravity: 0.005,
-    isInCanvas: pos => {
+    transitionVel: 36,
+    isInCanvas: (arg1, arg2) => {
         "use strict";
-        return Main.rectContains(0, 0, Main.width, Main.height, pos);
-    },
-    rectContains: (rectX, rectY, width, height, pos) => {
-        "use strict";
-        return pos.x >= rectX &&
-               pos.y >= rectY &&
-               pos.x <= rectX + width &&
-               pos.y <= rectY + height;
+        return Main.canvasRect.contains(arg1, arg2);
     },
     noSupportFailure: (htmlName, plainName) => {
         "use strict";
@@ -105,7 +100,7 @@ Main.init = () => {
 
         // Run all current draw loops sequentially.
         Main.currentLoops.forEach((displacement, loopId) => {
-            // Save state.
+            // Save state (all).
             ctx.save();
 
             // Displace entire drawing if necessary.
