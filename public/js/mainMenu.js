@@ -15,6 +15,12 @@ Main.mainMenu = (canvas, ctx) => {
     const buttonBgPattern = ctx.createPattern(buttonBg, "repeat");
 
     // Generating button data.
+    const playCallback = Main.getTransition(
+        "mainMenu",
+        "serverSelect",
+        0,
+        eventListeners
+    );
     const aboutCallback = Main.getTransition(
         "mainMenu",
         "aboutPage",
@@ -23,7 +29,7 @@ Main.mainMenu = (canvas, ctx) => {
     );
 
     const buttons =
-        [ [rect(150, 550, 325, 100), 7, "play"]
+        [ [rect(150, 550, 325, 100), 7, "play",  playCallback]
         , [rect(805, 550, 325, 100), 7, "about", aboutCallback]
         ];
     const screwAngles =

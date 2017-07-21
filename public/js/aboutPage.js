@@ -30,7 +30,7 @@ Main.aboutPage = (canvas, ctx) => {
     };
 
     const buttons =
-        [ [rect(150, 550, 325, 100), 7, "main", mainCallback]
+        [ [rect(150, 550, 325, 100), 7, "main",   mainCallback]
         , [rect(805, 550, 325, 100), 7, "source", sourceCallback]
         ];
 
