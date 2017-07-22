@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: lts-8.23
+resolver: nightly-2017-07-21
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -39,7 +39,9 @@ packages:
 - '.'
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
-extra-deps: []
+extra-deps: [
+  containers-0.5.10.2
+]
 
 # Override default flag values for local packages and extra-deps
 flags: {}
@@ -56,11 +58,21 @@ extra-package-dbs: []
 #
 # Override the architecture used by stack, especially useful on Windows
 # arch: i386
-# arch: x86_64
+arch: x86_64
 #
 # Extra directories used by stack for building
 # extra-include-dirs: [/path/to/dir]
 # extra-lib-dirs: [/path/to/dir]
 #
 # Allow a newer minor version of GHC than the snapshot specifies
-# compiler-check: newer-minor
+compiler-check: newer-minor
+
+# Rebuild a package when its GHC options change
+rebuild-ghc-options: true
+
+ghc-options:
+    # All packages
+    "*": '-O2 -funbox-strict-fields -threaded -rtsopts "-with-rtsopts=-N" -Wall -fprint-unicode-syntax -fwarn-tabs'
+
+# Packages that ghc-options applies to
+apply-ghc-options: targets # All local packages that are targets

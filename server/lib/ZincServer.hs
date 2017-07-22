@@ -2,7 +2,49 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Strict            #-}
 
-module Main where
+{-# OPTIONS_GHC -funbox-strict-fields #-}
+
+{-# OPTIONS_HADDOCK show-extensions #-}
+
+-- | Module      : ZincServer
+--   Description : Server for the /zinc/ game.
+--   Copyright   : [copyleft] AugmentedFifth, 2017
+--   License     : AGPL-3
+--   Maintainer  : zcomito@gmail.com
+--   Stability   : experimental
+--   Portability : POSIX
+module ZincServer
+    ( -- * Data/type definitions
+      Client
+    , GameState
+    , Game
+    , ServerState
+    , -- * Constants
+      initServerState
+    , hello
+    , -- * Utility functions
+      (*+)
+    , uuidToReadableBs
+    , newClient
+    , newGame
+    , numClients
+    , clientExists
+    , addClient
+    , removeFromGame
+    , unregisterClient
+    , removeClient
+    , removeClientByUuid
+    , createNewGame
+    , parseByteString
+    , -- * Primary functions
+      broadcast
+    , sendGameList
+    , registerNewGame
+    , commLoop
+    , webSocketConnect
+    , site
+    , main
+    ) where
 
 import           Control.Applicative           (pure, (<|>))
 import           Control.Concurrent.STM
@@ -16,7 +58,7 @@ import           Data.ByteString               (ByteString)
 import qualified Data.ByteString               as B
 import qualified Data.ByteString.Char8         as BC
 import           Data.Foldable                 (sequence_)
-import           Data.Map.Strict               (Map)
+import           Data.Map.Strict               (Map, (!?))
 import qualified Data.Map.Strict               as Map
 import           Data.Set                      (Set)
 import qualified Data.Set                      as Set
@@ -35,7 +77,8 @@ import           Snap.Http.Server
 import           Snap.Util.FileServe
 
 
-{- Data/type definitions -}
+-- * Data/type definitions
+
 data Client = Client
     { _uuid       :: UUID
     , _username   :: ByteString
@@ -98,14 +141,16 @@ connection = lens _connection (\c cn -> c { _connection = cn })
 currGame :: Lens' Client ByteString
 currGame = lens _currGame (\c cg -> c { _currGame = cg })
 
-{- Constants -}
+-- * Constants
+
 initServerState :: ServerState
 initServerState = ServerState { _clients = Map.empty, _games = Map.empty }
 
 hello :: ByteString
 hello = B.pack [0x05, 0x58, 0xe6, 0x39, 0x0a, 0xc4, 0x13, 0x24]
 
-{- Utility functions -}
+-- * Utility functions
+
 infixr 5 *+
 (*+) :: Monoid a => a -> a -> a
 (*+) = mappend
@@ -146,22 +191,48 @@ addClient client server =
 
 removeFromGame :: Client -> ServerState -> ServerState
 removeFromGame client server =
-    if B.null (client^.currGame) then
-        server
-    else
-        -- Lens magic that deletes the client from the game
-        -- that they are `curr`ently in.
-        server & games %~
-            Map.adjust (& players %~ Set.delete client) (client^.currGame)
+    case (server^.games) !? gameN of
+        Just game ->
+            if Set.size (game^.players) < 2 then
+                -- We're removing the last player, so just get rid of the
+                -- whole game.
+                server & games %~ Map.delete gameN
+            else
+                -- Just remove the client from the game's player set.
+                server & games %~
+                    Map.adjust (& players %~ Set.delete client) gameN
+        _ -> server
+  where
+    gameN = client^.currGame
 {-# INLINE removeFromGame #-}
 
 unregisterClient :: Client -> ServerState -> ServerState
 unregisterClient client server = server & clients %~ Map.delete (client^.uuid)
 {-# INLINE unregisterClient #-}
 
+-- | Removes the given client from the given server's global register as well
+--   as removes them from their currently active game, if any. If this leaves
+--   the game empty, then the game is also disposed.
+--
+--   __Do not call this function__ unless you know you have the latest version
+--   of the client in question; if you don't, call 'removeClientByUuid'
+--   instead.
 removeClient :: Client -> ServerState -> ServerState
 removeClient client = unregisterClient client . removeFromGame client
 {-# INLINE removeClient #-}
+
+-- | Queries the server's global register for the client via UUID, and then
+--   calls 'removeClient' on that fresh client. Only requires UUID, not the
+--   most recent version of the client.
+--
+--   Does nothing (equivalent to 'id') if there is no such client with the
+--   given UUID.
+removeClientByUuid :: UUID -> ServerState -> ServerState
+removeClientByUuid uid server =
+    case (server^.clients) !? uid of
+        Just client -> removeClient (client) server
+        _           -> server
+{-# INLINE removeClientByUuid #-}
 
 createNewGame :: Client -> ByteString -> ServerState -> ServerState
 createNewGame host name =
@@ -180,22 +251,23 @@ parseByteString :: ByteString -> [ByteString]
 parseByteString s = reverse (parseByteString' [] s)
 {-# INLINE parseByteString #-}
 
-{- Primary functions -}
+-- * Primary functions
+
 broadcast :: ByteString -> ServerState -> IO ()
 broadcast msg server = sequence_ $!
     ((`WS.sendBinaryData` msg) . (^. connection)) <$> (server^.clients)
 
 sendGameList :: ServerState -> Client -> IO ()
-sendGameList state client =
+sendGameList server client =
     let conn = client^.connection
         getGameInfo g = B.cons (fromIntegral (B.length $! g^.gameName))
                       $! g^.gameName
                      *+ B.singleton (fromIntegral $! Set.size $! g^.players)
-        gameInfoList = getGameInfo <$> Map.elems (state^.games)
+        gameInfoList = getGameInfo <$> Map.elems (server^.games)
     in  WS.sendBinaryData conn (B.cons 0 $! B.concat gameInfoList)
 
 registerNewGame :: TVar ServerState -> Client -> ByteString -> IO ()
-registerNewGame tState host msg =
+registerNewGame state host msg =
     if length parsed /= 2 || any invalidString parsed then
         WS.sendBinaryData conn ("\1\1" :: ByteString)
     else let [newUsername, newGameName] = parsed in
@@ -205,16 +277,17 @@ registerNewGame tState host msg =
                 WS.sendBinaryData conn ("\1\3" :: ByteString)
            | otherwise -> do
                 let sameUsername client = client^.username == newUsername
-                state <- readTVarIO tState
-                if any sameUsername $! Map.elems (state^.clients) then
+                server <- readTVarIO state
+                if any sameUsername $! Map.elems (server^.clients) then
                     WS.sendBinaryData conn ("\1\2" :: ByteString)
-                else if newGameName `Map.member` (state^.games) then
+                else if newGameName `Map.member` (server^.games) then
                     WS.sendBinaryData conn ("\1\3" :: ByteString)
                 else do
                     let newHost = host & username .~ newUsername
                                        & currGame .~ newGameName
                     atomically $!
-                        modifyTVar' tState (createNewGame newHost newGameName)
+                        modifyTVar' state (createNewGame newHost newGameName)
+
                     WS.sendBinaryData conn ("\1\0" :: ByteString)
   where
     conn = host^.connection
@@ -222,12 +295,12 @@ registerNewGame tState host msg =
     invalidString s = B.length s < 2 || B.any (\w -> w < 32 || w > 126) s
 
 commLoop :: WS.Connection -> TVar ServerState -> Client -> IO ()
-commLoop conn tState client = forever $! do
+commLoop conn state client = forever $! do
     msg <- WS.receiveData conn
-    state <- readTVarIO tState
+    server <- readTVarIO state
     unless (B.null msg) $! case B.head msg of
-        0 -> sendGameList state client
-        1 -> registerNewGame tState client (B.tail msg)
+        0 -> sendGameList server client
+        1 -> registerNewGame state client (B.tail msg)
         _ -> pure ()
 
 webSocketConnect :: TVar ServerState -> WS.ServerApp
@@ -244,7 +317,8 @@ webSocketConnect state pending = do
         print newUuid
 
         let client = newClient newUuid conn
-        let disconnect = atomically $! modifyTVar' state (removeClient client)
+        let disconnect = atomically $!
+                             modifyTVar' state (removeClientByUuid newUuid)
 
         flip finally disconnect $! do
             atomically $! modifyTVar' state $! addClient client

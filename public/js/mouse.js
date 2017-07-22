@@ -1,27 +1,44 @@
-function registerMouse(canvas, eventListeners, buttons) {
+function registerMouse(canvas, eventListeners, buttons, trailEffects) {
     "use strict";
+
+    if (trailEffects === undefined) {
+        trailEffects = true;
+    }
 
     const mouseState = Object.create(null);
 
-    // Circular buffer to store mouse position history.
-    mouseState.mouseLocs = new CircularBuffer(168);
+    if (trailEffects) {
+        // Circular buffer to store mouse position history.
+        mouseState.mouseLocs = new CircularBuffer(168);
+    } else {
+        // Single `V2` to store the last captured mouse position.
+        mouseState.newestMouseLoc = null;
+    }
 
-    const _mousemove = e => {
+    const _mousemove = trailEffects ? e => {
         const boundingRect = canvas.getBoundingClientRect();
         mouseState.mouseLocs.cons(
             v2(e.clientX - boundingRect.left, e.clientY - boundingRect.top)
+        );
+    } : e => {
+        const boundingRect = canvas.getBoundingClientRect();
+        mouseState.newestMouseLoc = v2(
+            e.clientX - boundingRect.left,
+            e.clientY - boundingRect.top
         );
     };
     canvas.addEventListener("mousemove", _mousemove);
     eventListeners.register(canvas, "mousemove", _mousemove);
 
-    const _mouseenter = () => mouseState.mouseLocs.clear();
-    canvas.addEventListener("mouseenter", _mouseenter);
-    eventListeners.register(canvas, "mouseenter", _mouseenter);
+    if (trailEffects) {
+        const _mouseenter = () => mouseState.mouseLocs.clear();
+        canvas.addEventListener("mouseenter", _mouseenter);
+        eventListeners.register(canvas, "mouseenter", _mouseenter);
 
-    // Circular buffer to store mouse particle effect state.
-    mouseState.mouseSparks = new CircularBuffer(64);
-    mouseState.lastSparkPos = V2.zero();
+        // Circular buffer to store mouse particle effect state.
+        mouseState.mouseSparks = new CircularBuffer(64);
+        mouseState.lastSparkPos = V2.zero();
+    }
 
     // Cursor click animation state and trigger.
     mouseState.clickAnim = null;

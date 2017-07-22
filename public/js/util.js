@@ -1107,3 +1107,65 @@ EventRegistrar.prototype.forEach = function(f) {
         )
     );
 };
+
+
+/* ===| General purpose functions |=== */
+
+
+/**
+ * Returns an `Array` of `number`s that represents a "range" between `start`
+ * (inclusive) and `end` (exclusive). The range steps by increments of `step`.
+ * If `step` is omitted, it defaults to `1`. If, furthermore, `end` is omitted,
+ * `end` takes the value of `start`, and `start` takes the value of `0`.
+ *
+ * If `step` is negative or `end` is less than `start` (or both), the resulting
+ * range is descending. Otherwise the range is ascending.
+ *
+ * @param {number} start - Integer to start at (inclusive).
+ * @param {number=} end - Integer to end at (exclusive).
+ * @param {number=} step - How much to step by, default 1.
+ * @return {number[]} - A range of integers.
+ */
+function range(start, end, step) {
+    "use strict";
+
+    if (end === undefined) {
+        end = start;
+        start = 0;
+    }
+    if (!step) {
+        step = 1;
+    }
+
+    const ret = [];
+    if (end < start) {
+        step = Math.abs(step);
+        for (let i = start; i > end; i -= step) {
+            ret.push(i);
+        }
+    } else if (step < 0) {
+        for (let i = end - 1; i >= start; i += step) {
+            ret.push(i);
+        }
+    } else {
+        for (let i = start; i < end; i += step) {
+            ret.push(i);
+        }
+    }
+    return ret;
+}
+
+/**
+ * Gets and returns a random element of the passed-in array-like object.
+ *
+ * By array-like, it is meant that the object supports indexing (`arr[0]`,
+ * `arr[1]`, ...) and has a corresponding `.length` property.
+ *
+ * @template T
+ * @param {T[]} arr - The array-like object to choose from.
+ * @return {T} - A random element of `arr`.
+ */
+function getRand(arr) {
+    "use strict";
+    return arr[Math.floor(arr.length * Math.random())];
+}

@@ -187,10 +187,10 @@ Main.serverSelect = (canvas, ctx, ws) => {
                     newServerListRects.push([
                         serverName,
                         rect(
-                            Main.width / 2 - width / 2,
+                            Main.width / 2 - width / 2 - 10,
                             drawHeight - fontHeight,
-                            width,
-                            fontHeight
+                            width + 20,
+                            fontHeight + 8
                         )
                     ]);
                 });
@@ -214,7 +214,7 @@ Main.serverSelect = (canvas, ctx, ws) => {
             if (hoveredServerName) {
                 ctx.save();
 
-                ctx.fillStyle = "rgba(232, 232, 232, 0.375)";
+                ctx.fillStyle = "rgba(232, 232, 232, 0.3)";
                 const [ , box] = hoveredServerName;
                 ctx.fillRect(box.x, box.y, box.width, box.height);
 
