@@ -1045,3 +1045,65 @@ function bezier2(p0, p1, p2, t) {
     return timeComplement * (timeComplement * p0 + t * p1) +
            t              * (timeComplement * p1 + t * p2);
 }
+
+
+/* =====================| Data handling functions |===================== */
+
+
+/**
+ * Takes in an `ArrayBuffer` and returns a `string` that is the result of
+ * interpreting the `ArrayBuffer`'s data as ASCII encoded text.
+ *
+ * @param {ArrayBuffer} buffer
+ * @return {string}
+ */
+function bufferToAscii(buffer) {
+    "use strict";
+    return u8ArrayToAscii(new Uint8Array(buffer));
+}
+
+/**
+ * Like `bufferToAscii()`, but takes in a `Uint8Array` for use when the view
+ * already exists.
+ *
+ * @param {Uint8Array} u8arr
+ * @return {string}
+ */
+function u8ArrayToAscii(u8arr) {
+    "use strict";
+    let s = "";
+    for (let i = 0; i < u8arr.length; ++i) {
+        s += String.fromCharCode(u8arr[i]);
+    }
+    return s;
+}
+
+
+/* ========================| Event handling |======================== */
+
+
+/**
+ * Handles deregistering of event listeners.
+ */
+function EventRegistrar() {
+    "use strict";
+    this.events = new Map();
+}
+
+EventRegistrar.prototype.register = function(target, type, fn) {
+    "use strict";
+    if (this.events.has(type)) {
+        this.events.set(type, this.events.get(type).concat([[target, fn]]));
+    } else {
+        this.events.set(type, [[target, fn]]);
+    }
+};
+
+EventRegistrar.prototype.forEach = function(f) {
+    "use strict";
+    this.events.forEach(
+        (pairs, type) => pairs.forEach(
+            ([target, fn]) => f(target, type, fn)
+        )
+    );
+};

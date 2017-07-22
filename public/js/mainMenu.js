@@ -2,7 +2,7 @@ Main.mainMenu = (canvas, ctx) => {
     "use strict";
 
     // Holding a local copy of event listeners so they can be unloaded.
-    const eventListeners = new Map();
+    const eventListeners = new EventRegistrar();
 
     // Initialize patterns.
     const darkBg = document.getElementById("45-deg-dark-jean-pattern");

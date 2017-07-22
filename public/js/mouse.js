@@ -13,11 +13,11 @@ function registerMouse(canvas, eventListeners, buttons) {
         );
     };
     canvas.addEventListener("mousemove", _mousemove);
-    eventListeners.set("mousemove", _mousemove);
+    eventListeners.register(canvas, "mousemove", _mousemove);
 
     const _mouseenter = () => mouseState.mouseLocs.clear();
     canvas.addEventListener("mouseenter", _mouseenter);
-    eventListeners.set("mouseenter", _mouseenter);
+    eventListeners.register(canvas, "mouseenter", _mouseenter);
 
     // Circular buffer to store mouse particle effect state.
     mouseState.mouseSparks = new CircularBuffer(64);
@@ -47,7 +47,7 @@ function registerMouse(canvas, eventListeners, buttons) {
         }
     };
     canvas.addEventListener("click", _click);
-    eventListeners.set("click", _click);
+    eventListeners.register(canvas, "click", _click);
 
     return mouseState;
 }
@@ -91,13 +91,12 @@ function drawMouseTrail(ctx, mouseState) {
                          (Math.random() < 0.5 ? 1 : -1);
             const yVel = -0.5 * Math.random() + 0.125;
             mouseState.lastSparkPos = newestMouseLoc;
-            mouseState.mouseSparks.cons(
-                [ newestMouseLoc
-                , v2(xVel, yVel)
-                , 0
-                , Math.floor(128 + 96 * Math.random())
-                ]
-            );
+            mouseState.mouseSparks.cons([
+                newestMouseLoc,
+                v2(xVel, yVel),
+                0,
+                Math.floor(128 + 96 * Math.random())
+            ]);
         }
     }
     ctx.closePath();

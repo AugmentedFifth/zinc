@@ -1,10 +1,12 @@
 const Main = {
     doLoop: true,
     currentLoops: new Map([["mainMenu", V2.zero()]]),
+    wsRecvCallback: null,
     lastLoop: 0,
     width: 1280,
     height: 720,
     canvasRect: rect(0, 0, 1280, 720),
+    maxPlayerCount: 2,
     clickAnimDur: 250, // milliseconds
     crosshairQuad: [v2(15, 0), v2(-15, 0), v2(0, 15), v2(0, -15)],
     sparkGravity: 0.005,
@@ -76,6 +78,8 @@ Main.init = () => {
                 ws.close(4002, errMsg);
                 throw new Error(errMsg);
             }
+        } else if (Main.wsRecvCallback) {
+            Main.wsRecvCallback(data);
         }
     });
 
@@ -88,31 +92,45 @@ Main.init = () => {
      * Function for making new transition callbacks.
      * Values for `dir`:
      *
-     * - 0 <=> Go to a page up.
-     * - 1 <=> Right.
-     * - 2 <=> Down.
-     * - 3 <=> Left.
-     * - Anything else <=> Runtime error.
+     * - 0 -> Go to a page up.
+     * - 1 -> Right.
+     * - 2 -> Down.
+     * - 3 -> Left.
+     * - _ -> Runtime error.
      *
      * @param {string} thisName - The name of the page to be transitioned from,
      *                            as registered in `Main.currentLoops`.
      * @param {string} destName - The name of the page to be transitioned to.
      * @param {number} dir - Direction of the page to transition to, relative
      *                       to the current page.
-     * @param {Map<string, function>} eventListeners - A `Map` of `EventTypes`
-     *     (`string`s) to the functions registered to those types, as
-     *     registered by the current page to the `canvas`.
+     * @param {EventRegistrar} eventListeners - An `EventRegistrar` of event
+     *                                          listeners registered by the
+     *                                          current page.
      * @return {function} - The new callback.
      */
     Main.getTransition = function(thisName, destName, dir, eventListeners) {
+        if (![0, 1, 2, 3].includes(dir)) {
+            throw new Error(
+                "Main.getTransition(): Expected dir to be in [0, 1, 2, 3]. " +
+                    `Got: ${dir}`
+            );
+        }
+
+        const relevantDim = dir === 0 || dir === 2 ? Main.height : Main.width;
+
         function transitionCallback(t=0) {
             if (t === 0) {
                 eventListeners.forEach(
-                    (fn, type) => canvas.removeEventListener(type, fn)
+                    (target, type, fn) => target.removeEventListener(type, fn)
                 );
             }
 
-            const disp = bezier2(0, 0.75, Main.width, t / Main.transitionTime);
+            const disp = bezier2(
+                0,
+                0.75,
+                relevantDim,
+                t / Main.transitionTime
+            );
 
             if (Main.currentLoops.has(destName)) {
                 if (t >= Main.transitionTime) {
@@ -122,39 +140,51 @@ Main.init = () => {
                     if (dir === 0) {
                         Main.currentLoops.get(thisName).y = disp;
                         Main.currentLoops.get(destName).y =
-                            -Main.width + disp + 1;
+                            -relevantDim + disp + 1;
                     } else if (dir === 1) {
                         Main.currentLoops.get(thisName).x = -disp;
                         Main.currentLoops.get(destName).x =
-                            Main.width - disp - 1;
+                            relevantDim - disp - 1;
                     } else if (dir === 2) {
                         Main.currentLoops.get(thisName).y = -disp;
                         Main.currentLoops.get(destName).y =
-                            Main.width - disp - 1;
+                            relevantDim - disp - 1;
                     } else if (dir === 3) {
                         Main.currentLoops.get(thisName).x = disp;
                         Main.currentLoops.get(destName).x =
-                            -Main.width + disp + 1;
+                            -relevantDim + disp + 1;
                     }
                 }
             } else {
                 if (dir === 0) {
                     Main.currentLoops.get(thisName).y = disp;
-                    Main.currentLoops.set(destName, v2(0, -Main.width + disp));
+                    Main.currentLoops.set(
+                        destName,
+                        v2(0, -relevantDim + disp)
+                    );
                 } else if (dir === 1) {
                     Main.currentLoops.get(thisName).x = -disp;
-                    Main.currentLoops.set(destName, v2(Main.width - disp, 0));
+                    Main.currentLoops.set(
+                        destName,
+                        v2(relevantDim - disp, 0)
+                    );
                 } else if (dir === 2) {
                     Main.currentLoops.get(thisName).y = -disp;
-                    Main.currentLoops.set(destName, v2(0, Main.width - disp));
+                    Main.currentLoops.set(
+                        destName,
+                        v2(0, relevantDim - disp)
+                    );
                 } else if (dir === 3) {
                     Main.currentLoops.get(thisName).x = disp;
-                    Main.currentLoops.set(destName, v2(-Main.width + disp, 0));
+                    Main.currentLoops.set(
+                        destName,
+                        v2(-relevantDim + disp, 0)
+                    );
                 }
             }
 
             if (Main.currentLoops.has(thisName)) {
-                setTimeout(() => transitionCallback(t + 16.6), 16.6);
+                window.setTimeout(() => transitionCallback(t + 16.6), 16.6);
             }
         }
 
@@ -191,7 +221,7 @@ Main.init = () => {
             if (registeredLoops.has(loopId)) {
                 registeredLoops.get(loopId)(displacement, dt);
             } else {
-                const closuredLoop = Main[loopId](canvas, ctx);
+                const closuredLoop = Main[loopId](canvas, ctx, ws);
                 registeredLoops.set(loopId, closuredLoop);
                 closuredLoop(displacement, dt);
             }

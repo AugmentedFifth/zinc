@@ -1,5 +1,5 @@
-{-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE Strict            #-}
 
 module Main where
 
@@ -9,7 +9,7 @@ import           Control.Exception             (finally)
 import           Control.Lens.Getter           ((^.))
 import           Control.Lens.Lens             (Lens', lens, (&))
 import           Control.Lens.Setter           ((%~))
-import           Control.Monad                 (forever)
+import           Control.Monad                 (forever, unless)
 
 import           Data.ByteString               (ByteString)
 import qualified Data.ByteString               as B
@@ -36,30 +36,30 @@ import           Snap.Util.FileServe
 
 {- Data/type definitions -}
 data Client = Client
-    { _uuid       :: {-# UNPACK #-} !UUID
-    , _username   :: {-# UNPACK #-} !ByteString
-    , _connection :: {-# UNPACK #-} !WS.Connection
+    { _uuid       :: UUID
+    , _username   :: ByteString
+    , _connection :: WS.Connection
     }
 
 instance Eq Client where
-    (==) !c1 !c2 = c1^.uuid == c2^.uuid
+    (==) c1 c2 = c1^.uuid == c2^.uuid
 
 instance Ord Client where
-    compare !c1 !c2 = compare (c1^.uuid) (c2^.uuid)
+    compare c1 c2 = compare (c1^.uuid) (c2^.uuid)
 
 instance Show Client where
-    show !c = "Client {"
-           ++ UID.toString (c^.uuid)
-           ++ ", "
-           ++ BC.unpack (c^.username)
-           ++ "}"
+    show c = "Client {"
+          ++ UID.toString (c^.uuid)
+          ++ ", "
+          ++ BC.unpack (c^.username)
+          ++ "}"
 
 type GameState = Int
 
 data Game = Game
-    { _gameName  :: {-# UNPACK #-} !ByteString
+    { _gameName  :: ByteString
     , _players   :: Set Client
-    , _gameState :: {-# UNPACK #-} !GameState
+    , _gameState :: GameState
     } deriving (Show)
 
 data ServerState = ServerState
@@ -110,7 +110,7 @@ uuidToReadableBs = BC.pack . UID.toString
 {-# INLINE uuidToReadableBs #-}
 
 newClient :: UUID -> WS.Connection -> Client
-newClient !uid !conn = Client
+newClient uid conn = Client
     { _uuid       = uid
     , _connection = conn
     , _username   = ""
@@ -118,35 +118,46 @@ newClient !uid !conn = Client
 {-# INLINE newClient #-}
 
 numClients :: ServerState -> Int
-numClients !server = Map.size $ server^.clients
+numClients server = Map.size $ server^.clients
 {-# INLINE numClients #-}
 
 clientExists :: Client -> ServerState -> Bool
-clientExists !client !server = (client^.uuid) `Map.member` (server^.clients)
+clientExists client server = (client^.uuid) `Map.member` (server^.clients)
 {-# INLINE clientExists #-}
 
 addClient :: Client -> ServerState -> ServerState
-addClient !client !server =
+addClient client server =
     server & clients %~ Map.insert (client^.uuid) client
 {-# INLINE addClient #-}
 
 removeClient :: Client -> ServerState -> ServerState
-removeClient !client !server = server & clients %~ Map.delete (client^.uuid)
+removeClient client server = server & clients %~ Map.delete (client^.uuid)
 {-# INLINE removeClient #-}
 
 {- Primary functions -}
 broadcast :: ByteString -> ServerState -> IO ()
-broadcast !msg !server = sequence_ $
+broadcast msg server = sequence_ $
     ((`WS.sendBinaryData` msg) . (^. connection)) <$> (server^.clients)
 
+sendGameList :: ServerState -> Client -> IO ()
+sendGameList state client =
+    let conn = client^.connection
+        getGameInfo g = B.cons (fromIntegral (B.length $ g^.gameName))
+                      $ g^.gameName
+                     *+ B.singleton (fromIntegral $ Set.size $ g^.players)
+        gameInfoList = getGameInfo <$> Map.elems (state^.games)
+    in  WS.sendBinaryData conn (B.cons 0 $ B.concat gameInfoList)
+
 commLoop :: WS.Connection -> TVar ServerState -> Client -> IO ()
-commLoop !conn !tState !client = forever $ do
+commLoop conn tState client = forever $ do
     msg <- WS.receiveData conn
     state <- readTVarIO tState
-    broadcast (uuidToReadableBs (client^.uuid) *+ " | " *+ msg) state
+    unless (B.null msg) $ case B.head msg of
+        0 -> sendGameList state client
+        _ -> pure ()
 
 webSocketConnect :: TVar ServerState -> WS.ServerApp
-webSocketConnect !state !pending = do
+webSocketConnect state pending = do
     conn <- WS.acceptRequest pending
     msg <- WS.receiveData conn
 
@@ -159,26 +170,14 @@ webSocketConnect !state !pending = do
         print newUuid
 
         let client = newClient newUuid conn
-        let disconnect = do
-                -- Remove client and return new state
-                atomically $ modifyTVar' state (removeClient client)
-                s <- readTVarIO state
-                let disconnectMsg =
-                        uuidToReadableBs (client^.uuid) *+ " disconnected"
-                broadcast disconnectMsg s
+        let disconnect = atomically $ modifyTVar' state (removeClient client)
 
         flip finally disconnect $ do
-            s' <- atomically $ do
-                modifyTVar' state $ addClient client
-                readTVar state
-            let clientUuids = uuidToReadableBs <$> Map.keys (s'^.clients)
-            WS.sendBinaryData conn $
-                "Welcome! Users: " *+ B.intercalate ", " clientUuids
-            broadcast (uuidToReadableBs (client^.uuid) *+ " joined") s'
+            atomically $ modifyTVar' state $ addClient client
             commLoop conn state client
 
 site :: TVar ServerState -> Snap ()
-site !state =
+site state =
         ifTop (serveFile "public/index.html")
     <|> route [ ("ws", runWebSocketsSnap $ webSocketConnect state)
               , ("",   serveDirectory "public")
