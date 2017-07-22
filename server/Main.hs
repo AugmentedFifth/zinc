@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiWayIf        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Strict            #-}
 
@@ -8,7 +9,7 @@ import           Control.Concurrent.STM
 import           Control.Exception             (finally)
 import           Control.Lens.Getter           ((^.))
 import           Control.Lens.Lens             (Lens', lens, (&))
-import           Control.Lens.Setter           ((%~))
+import           Control.Lens.Setter           ((%~), (.~))
 import           Control.Monad                 (forever, unless)
 
 import           Data.ByteString               (ByteString)
@@ -39,6 +40,7 @@ data Client = Client
     { _uuid       :: UUID
     , _username   :: ByteString
     , _connection :: WS.Connection
+    , _currGame   :: ByteString
     }
 
 instance Eq Client where
@@ -93,6 +95,9 @@ username = lens _username (\c un -> c { _username = un })
 connection :: Lens' Client WS.Connection
 connection = lens _connection (\c cn -> c { _connection = cn })
 
+currGame :: Lens' Client ByteString
+currGame = lens _currGame (\c cg -> c { _currGame = cg })
+
 {- Constants -}
 initServerState :: ServerState
 initServerState = ServerState { _clients = Map.empty, _games = Map.empty }
@@ -114,11 +119,20 @@ newClient uid conn = Client
     { _uuid       = uid
     , _connection = conn
     , _username   = ""
+    , _currGame   = ""
     }
 {-# INLINE newClient #-}
 
+newGame :: ByteString -> Client -> Game
+newGame name host = Game
+    { _gameName  = name
+    , _players   = Set.singleton host
+    , _gameState = 0
+    }
+{-# INLINE newGame #-}
+
 numClients :: ServerState -> Int
-numClients server = Map.size $ server^.clients
+numClients server = Map.size $! server^.clients
 {-# INLINE numClients #-}
 
 clientExists :: Client -> ServerState -> Bool
@@ -130,30 +144,90 @@ addClient client server =
     server & clients %~ Map.insert (client^.uuid) client
 {-# INLINE addClient #-}
 
+removeFromGame :: Client -> ServerState -> ServerState
+removeFromGame client server =
+    if B.null (client^.currGame) then
+        server
+    else
+        -- Lens magic that deletes the client from the game
+        -- that they are `curr`ently in.
+        server & games %~
+            Map.adjust (& players %~ Set.delete client) (client^.currGame)
+{-# INLINE removeFromGame #-}
+
+unregisterClient :: Client -> ServerState -> ServerState
+unregisterClient client server = server & clients %~ Map.delete (client^.uuid)
+{-# INLINE unregisterClient #-}
+
 removeClient :: Client -> ServerState -> ServerState
-removeClient client server = server & clients %~ Map.delete (client^.uuid)
+removeClient client = unregisterClient client . removeFromGame client
 {-# INLINE removeClient #-}
+
+createNewGame :: Client -> ByteString -> ServerState -> ServerState
+createNewGame host name =
+    (& games %~ Map.insert name (newGame name host)) . (addClient host)
+{-# INLINE createNewGame #-}
+
+parseByteString' :: [ByteString] -> ByteString -> [ByteString]
+parseByteString' rs s =
+    if B.null s then
+        rs
+    else
+        let (r, t) = B.splitAt (fromIntegral (B.head s)) (B.tail s)
+        in  parseByteString' (r : rs) t
+
+parseByteString :: ByteString -> [ByteString]
+parseByteString s = reverse (parseByteString' [] s)
+{-# INLINE parseByteString #-}
 
 {- Primary functions -}
 broadcast :: ByteString -> ServerState -> IO ()
-broadcast msg server = sequence_ $
+broadcast msg server = sequence_ $!
     ((`WS.sendBinaryData` msg) . (^. connection)) <$> (server^.clients)
 
 sendGameList :: ServerState -> Client -> IO ()
 sendGameList state client =
     let conn = client^.connection
-        getGameInfo g = B.cons (fromIntegral (B.length $ g^.gameName))
-                      $ g^.gameName
-                     *+ B.singleton (fromIntegral $ Set.size $ g^.players)
+        getGameInfo g = B.cons (fromIntegral (B.length $! g^.gameName))
+                      $! g^.gameName
+                     *+ B.singleton (fromIntegral $! Set.size $! g^.players)
         gameInfoList = getGameInfo <$> Map.elems (state^.games)
-    in  WS.sendBinaryData conn (B.cons 0 $ B.concat gameInfoList)
+    in  WS.sendBinaryData conn (B.cons 0 $! B.concat gameInfoList)
+
+registerNewGame :: TVar ServerState -> Client -> ByteString -> IO ()
+registerNewGame tState host msg =
+    if length parsed /= 2 || any invalidString parsed then
+        WS.sendBinaryData conn ("\1\1" :: ByteString)
+    else let [newUsername, newGameName] = parsed in
+        if | B.length newUsername > 24 ->
+                WS.sendBinaryData conn ("\1\2" :: ByteString)
+           | B.length newGameName > 32 ->
+                WS.sendBinaryData conn ("\1\3" :: ByteString)
+           | otherwise -> do
+                let sameUsername client = client^.username == newUsername
+                state <- readTVarIO tState
+                if any sameUsername $! Map.elems (state^.clients) then
+                    WS.sendBinaryData conn ("\1\2" :: ByteString)
+                else if newGameName `Map.member` (state^.games) then
+                    WS.sendBinaryData conn ("\1\3" :: ByteString)
+                else do
+                    let newHost = host & username .~ newUsername
+                                       & currGame .~ newGameName
+                    atomically $!
+                        modifyTVar' tState (createNewGame newHost newGameName)
+                    WS.sendBinaryData conn ("\1\0" :: ByteString)
+  where
+    conn = host^.connection
+    parsed = parseByteString msg
+    invalidString s = B.length s < 2 || B.any (\w -> w < 32 || w > 126) s
 
 commLoop :: WS.Connection -> TVar ServerState -> Client -> IO ()
-commLoop conn tState client = forever $ do
+commLoop conn tState client = forever $! do
     msg <- WS.receiveData conn
     state <- readTVarIO tState
-    unless (B.null msg) $ case B.head msg of
+    unless (B.null msg) $! case B.head msg of
         0 -> sendGameList state client
+        1 -> registerNewGame tState client (B.tail msg)
         _ -> pure ()
 
 webSocketConnect :: TVar ServerState -> WS.ServerApp
@@ -166,24 +240,24 @@ webSocketConnect state pending = do
     else do
         WS.forkPingThread conn 30
         newUuid <- nextRandom
-        WS.sendBinaryData conn $ UID.toByteString newUuid
+        WS.sendBinaryData conn $! UID.toByteString newUuid
         print newUuid
 
         let client = newClient newUuid conn
-        let disconnect = atomically $ modifyTVar' state (removeClient client)
+        let disconnect = atomically $! modifyTVar' state (removeClient client)
 
-        flip finally disconnect $ do
-            atomically $ modifyTVar' state $ addClient client
+        flip finally disconnect $! do
+            atomically $! modifyTVar' state $! addClient client
             commLoop conn state client
 
 site :: TVar ServerState -> Snap ()
 site state =
         ifTop (serveFile "public/index.html")
-    <|> route [ ("ws", runWebSocketsSnap $ webSocketConnect state)
+    <|> route [ ("ws", runWebSocketsSnap $! webSocketConnect state)
               , ("",   serveDirectory "public")
               ]
 
 main :: IO ()
 main = do
-    state <- atomically $ newTVar initServerState
+    state <- atomically $! newTVar initServerState
     httpServe (setPort 3000 mempty) (site state)

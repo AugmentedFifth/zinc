@@ -1,4 +1,4 @@
-Main.newGame = (canvas, ctx) => {
+Main.newGame = (canvas, ctx, ws) => {
     "use strict";
 
     // Holding a local copy of event listeners so they can be unloaded.
@@ -18,10 +18,6 @@ Main.newGame = (canvas, ctx) => {
     const naturalBlackPattern = ctx.createPattern(naturalBlack, "repeat");
 
     // Generating button data.
-    const startCallback = () => {
-        // ...
-    };
-
     const backCallback = Main.getTransition(
         "newGame",
         "serverSelect",
@@ -40,9 +36,78 @@ Main.newGame = (canvas, ctx) => {
 
     // Form boxes to be typed into.
     const formBoxes =
-        [ [rect(240, 200, 800, 45), "", false]
-        , [rect(240, 350, 800, 45), "", false]
+        [ [rect(240, 230, 800, 45), "", false, 24]
+        , [rect(240, 380, 800, 45), "", false, 32]
         ];
+
+    let alertText = [];
+
+    const wrongLength =
+        ([ , text, , maxLen]) => text.length < 2 || text.length > maxLen;
+    const illegalChar =
+        char => char.charCodeAt() < 32 || char.charCodeAt() > 126;
+    const newGameConfirmCallback = data => {
+        const bytes = new Uint8Array(data.data);
+        if (bytes[0] !== 0x01) {
+            console.log(
+                `Bad packet. Expecting leading 0x01 byte, got: ${bytes}`
+            );
+            return;
+        }
+        if (bytes[1] === 1) {
+            alertText =
+                [ "An error has occured in creating your new game."
+                , "Please try again later."
+                ];
+        } else if (bytes[1] === 2) {
+            alertText =
+                [ "It looks like someone else has that username already."
+                , "Change your name and try again."
+                ];
+        } else if (bytes[1] === 3) {
+            alertText =
+                [ "It looks like there's already a game called that."
+                , "Change your game's name and try again."
+                ];
+        } else {
+            const startGameCallback = Main.getTransition(
+                "newGame",
+                "game",
+                2,
+                eventListeners
+            );
+            startGameCallback();
+        }
+    };
+    function startCallback() {
+        if (formBoxes.some(wrongLength)) {
+            alertText =
+                [ "Make sure that both names are at least 2 characters"
+                , "long and that your name and the game name do not"
+                , "exceed 24 and 32 characters, respectively."
+                ];
+            return;
+        }
+        for (const [ , text] of formBoxes) {
+            for (const char of text) {
+                if (illegalChar(char)) {
+                    alertText = [`Illegal character: ${char}`];
+                    return;
+                }
+            }
+        }
+
+        const createNewGameBytes = [0x01];
+        for (const [ , text] of formBoxes) {
+            createNewGameBytes.push(text.length);
+            for (const char of text) {
+                createNewGameBytes.push(char.charCodeAt());
+            }
+        }
+
+        Main.wsRecvCallback = newGameConfirmCallback;
+        ws.send(new Uint8Array(createNewGameBytes).buffer);
+    }
 
     const formCursorPeriod = 1792;
     let formCursorTime = 0;
@@ -72,7 +137,11 @@ Main.newGame = (canvas, ctx) => {
             if (e.key === "Backspace" || e.key === "Delete") {
                 formBoxes[keydownedFormIx][1] =
                     formBoxes[keydownedFormIx][1].slice(0, -1);
-            } else if (e.key.length === 1) {
+            } else if (
+                e.key.length === 1 &&
+                formBoxes[keydownedFormIx][1].length <
+                    formBoxes[keydownedFormIx][3]
+            ) {
                 formBoxes[keydownedFormIx][1] += e.key;
             }
         }
@@ -130,6 +199,27 @@ Main.newGame = (canvas, ctx) => {
 
             ctx.restore();
         });
+
+        // Draw form labels.
+        ctx.save();
+        ctx.font = "36px 'Noto Sans', sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#777";
+        ctx.fillText("your name", Main.width / 2, 210);
+        ctx.fillText("game name", Main.width / 2, 360);
+        ctx.restore();
+
+        // Draw alert text.
+        if (alertText.length > 0) {
+            ctx.save();
+            ctx.font = "28px 'Noto Sans', sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillStyle = "rgba(232, 112, 128, 0.75)";
+            alertText.forEach(
+                (text, i) => ctx.fillText(text, Main.width / 2, 462 + i * 32)
+            );
+            ctx.restore();
+        }
 
         // Draw buttons.
         drawButtons(

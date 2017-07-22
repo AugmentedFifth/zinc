@@ -89,7 +89,7 @@ Main.serverSelect = (canvas, ctx, ws) => {
     // Requesting a list of servers and updating periodically.
     let serverList = null;
     const requestServerListPacket = new Uint8Array([0x00]).buffer;
-    const wsRecvCallback = data => {
+    const recvServerListCallback = data => {
         const bytes = new Uint8Array(data.data);
         if (bytes[0] !== 0x00) {
             console.log(
@@ -116,7 +116,7 @@ Main.serverSelect = (canvas, ctx, ws) => {
     };
     function requestServerList() {
         if (doRequestServerList) {
-            Main.wsRecvCallback = wsRecvCallback;
+            Main.wsRecvCallback = recvServerListCallback;
             ws.send(requestServerListPacket);
             window.setTimeout(requestServerList, 5000);
         }
