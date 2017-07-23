@@ -828,7 +828,7 @@ V2.prototype.dot = function(v) {
  */
 V2.prototype.norm = function() {
     "use strict";
-    return Math.sqrt(this.x * this.x + this.y + this.y);
+    return Math.sqrt(this.x * this.x + this.y * this.y);
 };
 
 /**
@@ -838,7 +838,7 @@ V2.prototype.norm = function() {
  */
 V2.prototype.quadrance = function() {
     "use strict";
-    return this.x * this.x + this.y + this.y;
+    return this.x * this.x + this.y * this.y;
 };
 
 /**
@@ -891,17 +891,17 @@ V2.prototype.dist = function(v) {
 
 /**
  * Gets the unit vector that is pointing in the same direction as this one.
- * Does nothing to zero vectors.
+ * Acts like `.clone()` for null vectors and unit vectors.
  *
  * @return {V2} - A unit vector, or zero vector if this vector is zero.
  */
 V2.prototype.normalize = function() {
     "use strict";
-    const norm = this.norm();
     const quad = this.quadrance();
     if (Math.abs(quad) <= V2.epsilon || Math.abs(quad - 1) <= V2.epsilon) {
         return this.clone();
     }
+    const norm = this.norm();
     return new V2(this.x / norm, this.y / norm);
 };
 
@@ -1109,7 +1109,7 @@ EventRegistrar.prototype.forEach = function(f) {
 };
 
 
-/* ===| General purpose functions |=== */
+/* ====================| General purpose functions |==================== */
 
 
 /**
@@ -1168,4 +1168,17 @@ function range(start, end, step) {
 function getRand(arr) {
     "use strict";
     return arr[Math.floor(arr.length * Math.random())];
+}
+
+/**
+ * Gets a random integer between `lowerBound` (inclusive) and `upperBound`
+ * (exclusive).
+ *
+ * @param {number} lowerBound
+ * @param {number} upperBound
+ * @return {number}
+ */
+function randInt(lowerBound, upperBound) {
+    "use strict";
+    return Math.floor((upperBound - lowerBound) * Math.random() + lowerBound);
 }
