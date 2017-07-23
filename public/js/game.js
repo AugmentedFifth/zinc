@@ -15,12 +15,12 @@ Main.game = (canvas, ctx, ws) => {
     const buttonBgPattern = ctx.createPattern(buttonBg, "repeat");
 
     // Game state.
-    const playerSide = 48;
     const player = new Player(
-        v2(randInt(50, Main.width - 50), randInt(50, Main.height - 50)),
+        v2(randInt(100, Main.width - 100), randInt(100, Main.height - 100)),
         12,
         3e-2,
-        1e-3
+        1e-3,
+        48
     );
     let keypressLog = [];
     const color = getRand([
@@ -92,6 +92,7 @@ Main.game = (canvas, ctx, ws) => {
     datGui.add(player, "mass", 1, 48);
     datGui.add(player, "appForce", 8e-3, 8e-2);
     datGui.add(player, "friction", 4e-4, 6e-3);
+    datGui.add(player, "side", 2, 128);
 
     // Game main loop.
     function aboutPage(displacement, dt) {
@@ -131,15 +132,17 @@ Main.game = (canvas, ctx, ws) => {
 
             if (t0 !== undefined) {
                 const thisDt = t1 - t0;
-                /* jshint loopfunc: true */
-                const dir = pressed.foldl(
-                    (d, k) => d.add(controllerKeys.get(k)),
-                    V2.zero()
-                ).normalize();
-                /* jshint loopfunc: false */
-                const thisAccel =
-                    dir.scalarMult(player.appForce / player.mass);
-                player.vel = player.vel.add(thisAccel.scalarMult(thisDt));
+                if (thisDt > 0) {
+                    /* jshint loopfunc: true */
+                    const dir = pressed.foldl(
+                        (d, k) => d.add(controllerKeys.get(k)),
+                        V2.zero()
+                    ).normalize();
+                    /* jshint loopfunc: false */
+                    const thisAccel =
+                        dir.scalarMult(player.appForce / player.mass);
+                    player.addVel(thisAccel.scalarMult(thisDt));
+                }
             }
 
             if (down) {
@@ -162,7 +165,7 @@ Main.game = (canvas, ctx, ws) => {
             const thisDt = now - t_;
             const thisAccel =
                 leftoverDir.scalarMult(player.appForce / player.mass);
-            player.vel = player.vel.add(thisAccel.scalarMult(thisDt));
+            player.addVel(thisAccel.scalarMult(thisDt));
         }
 
         // Apply frictional forces.
@@ -175,11 +178,27 @@ Main.game = (canvas, ctx, ws) => {
         } else {
             const frictionDv =
                 player.vel.normalize().scalarMult(frictionalDvNorm);
-            player.vel = player.vel.add(frictionDv);
+            player.addVel(frictionDv);
         }
 
         // Update position based on new velocity.
-        player.pos = player.pos.add(player.vel.scalarMult(dt));
+        player.addPos(player.vel.scalarMult(dt));
+
+        // Collision detection.
+        if (player.pos.y <= 0) { // Hit top
+            player.vel.y = -player.vel.y;
+            player.pos.y = 0;
+        } else if (player.pos.y >= Main.height - player.side) { // Hit bottom
+            player.vel.y = -player.vel.y;
+            player.pos.y = Main.height - player.side;
+        }
+        if (player.pos.x >= Main.width - player.side) { // Hit right
+            player.vel.x = -player.vel.x;
+            player.pos.x = Main.width - player.side;
+        } else if (player.pos.x <= 0) { // Hit left
+            player.vel.x = -player.vel.x;
+            player.pos.x = 0;
+        }
 
         // TODO: Send inputs to server.
 
@@ -189,7 +208,7 @@ Main.game = (canvas, ctx, ws) => {
         ctx.save();
 
         ctx.fillStyle = color;
-        ctx.fillRect(player.pos.x, player.pos.y, playerSide, playerSide);
+        ctx.fillRect(player.pos.x, player.pos.y, player.side, player.side);
 
         ctx.restore();
 
