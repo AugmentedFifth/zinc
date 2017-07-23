@@ -8,6 +8,20 @@ Array.prototype.toString = function() {
     return `[${this.join(", ")}]`;
 };
 
+/**
+ * Custom left-fold implementation for native ECMAScript `Set`.
+ *
+ * @template S
+ * @param {function} fold
+ * @param {S} seed
+ * @return {S}
+ */
+Set.prototype.foldl = function(fold, seed) {
+    "use strict";
+    this.forEach(v => seed = fold(seed, v));
+    return seed;
+};
+
 
 /* ================| Circular buffer implementation |================ */
 

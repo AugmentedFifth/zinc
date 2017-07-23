@@ -3,8 +3,17 @@ function drawButtons(ctx,
                      buttons,
                      buttonBgPattern,
                      textBgPattern,
-                     screwAngles) {
+                     screwAngles,
+                     fontSize,
+                     outline) {
     "use strict";
+
+    if (fontSize === undefined) {
+        fontSize = 64;
+    }
+    if (outline === undefined) {
+        outline = true;
+    }
 
     ctx.save();
 
@@ -59,7 +68,7 @@ function drawButtons(ctx,
         });
 
         // Text.
-        ctx.font = "64px 'Noto Sans', sans-serif";
+        ctx.font = `${fontSize}px 'Noto Sans', sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillStyle = textBgPattern;
@@ -69,13 +78,15 @@ function drawButtons(ctx,
             box.x + box.width / 2,
             box.y + box.height / 2 + yOffset
         );
-        ctx.strokeStyle = "rgba(144, 144, 144, 0.5)";
-        ctx.lineWidth = 2;
-        ctx.strokeText(
-            text,
-            box.x + box.width / 2,
-            box.y + box.height / 2 + yOffset
-        );
+        if (outline) {
+            ctx.strokeStyle = "rgba(144, 144, 144, 0.5)";
+            ctx.lineWidth = 2;
+            ctx.strokeText(
+                text,
+                box.x + box.width / 2,
+                box.y + box.height / 2 + yOffset
+            );
+        }
     });
 
     ctx.restore();

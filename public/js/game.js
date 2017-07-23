@@ -18,11 +18,11 @@ Main.game = (canvas, ctx, ws) => {
     const playerSide = 48;
     const player = new Player(
         v2(randInt(50, Main.width - 50), randInt(50, Main.height - 50)),
-        8,
-        3e-4
+        12,
+        3e-2,
+        1e-3
     );
     let keypressLog = [];
-    let friction = -4e-4;
     const color = getRand([
         "#914882",
         "#6a4891",
@@ -49,7 +49,7 @@ Main.game = (canvas, ctx, ws) => {
     };
 
     const buttons =
-        [ [rect(900, 660, 114, 50), 5, "main", mainCallback]
+        [ [rect(1155, 660, 114, 50), 5, "main", mainCallback]
         ];
 
     const screwAngles =
@@ -71,11 +71,7 @@ Main.game = (canvas, ctx, ws) => {
         const now = window.performance.now();
         const key = e.key.toLowerCase();
         if (controllerKeys.has(key)) {
-            if (
-                !keypressLog.some(([k, , t1]) => k === key && t1 === -1)
-            ) {
-                keypressLog.push([key, now, -1]);
-            }
+            keypressLog.push([now, key, true]);
         }
     };
     window.addEventListener("keydown", _keydown);
@@ -85,15 +81,17 @@ Main.game = (canvas, ctx, ws) => {
         const now = window.performance.now();
         const key = e.key.toLowerCase();
         if (controllerKeys.has(key)) {
-            for (let i = keypressLog.length - 1; i >= 0; --i) {
-                if (keypressLog[i][0] === key) {
-                    keypressLog[i][2] = now;
-                }
-            }
+            keypressLog.push([now, key, false]);
         }
     };
     window.addEventListener("keyup", _keyup);
     eventListeners.register(window, "keyup", _keyup);
+
+    // dat GUI.
+    const datGui = new dat.GUI();
+    datGui.add(player, "mass", 1, 48);
+    datGui.add(player, "appForce", 8e-3, 8e-2);
+    datGui.add(player, "friction", 4e-4, 6e-3);
 
     // Game main loop.
     function aboutPage(displacement, dt) {
@@ -110,7 +108,9 @@ Main.game = (canvas, ctx, ws) => {
             buttons,
             buttonBgPattern,
             textBgPattern,
-            screwAngles
+            screwAngles,
+            32,
+            false
         );
 
         // TODO: Draw info/status.
@@ -119,12 +119,54 @@ Main.game = (canvas, ctx, ws) => {
         // Get a copy of the keypress log to work with and then start a new
         // stack. We cut off any keys that are still down at this point, and
         // copy them over to the new stack.
-        let keypressLogCopy = keypressLog;
-        keypressLog = keypressLog.filter(kp => kp[2] === -1);
+        const keypressLogCopy = keypressLog;
+        keypressLog = [];
         const now = window.performance.now();
 
+        // Calculate accelerations for this frame based on keypress log.
+        const pressed = new Set();
+        let t0, t_;
+        for (let i = 0; i < keypressLogCopy.length; ++i) {
+            const [t1, key, down] = keypressLogCopy[i];
+
+            if (t0 !== undefined) {
+                const thisDt = t1 - t0;
+                /* jshint loopfunc: true */
+                const dir = pressed.foldl(
+                    (d, k) => d.add(controllerKeys.get(k)),
+                    V2.zero()
+                ).normalize();
+                /* jshint loopfunc: false */
+                const thisAccel =
+                    dir.scalarMult(player.appForce / player.mass);
+                player.vel = player.vel.add(thisAccel.scalarMult(thisDt));
+            }
+
+            if (down) {
+                pressed.add(key);
+                if (t0 === undefined) {
+                    t_ = t1;
+                }
+            } else {
+                pressed.delete(key);
+            }
+            t0 = t1;
+        }
+        let leftoverDir = V2.zero();
+        pressed.forEach(key => {
+            keypressLog.unshift([now, key, true]);
+            leftoverDir = leftoverDir.add(controllerKeys.get(key));
+        });
+        if (!leftoverDir.null()) {
+            leftoverDir = leftoverDir.normalize();
+            const thisDt = now - t_;
+            const thisAccel =
+                leftoverDir.scalarMult(player.appForce / player.mass);
+            player.vel = player.vel.add(thisAccel.scalarMult(thisDt));
+        }
+
         // Apply frictional forces.
-        const frictionalDvNorm = friction * dt;
+        const frictionalDvNorm = -player.friction * dt;
         if (
             player.vel.null() ||
             Math.abs(frictionalDvNorm) >= player.vel.norm()
@@ -135,49 +177,6 @@ Main.game = (canvas, ctx, ws) => {
                 player.vel.normalize().scalarMult(frictionalDvNorm);
             player.vel = player.vel.add(frictionDv);
         }
-
-        // Calculate accelerations for this frame based on keypress log.
-        let keypressLogCopyOrig = null;
-        let partiallyProcessed = [];
-        do {
-            for (let i = 0; i < keypressLogCopy.length; ++i) {
-                const [key, t0, _t1] = keypressLogCopy[i];
-                const t1 = _t1 === -1 ? now : _t1;
-                const nextT0 =
-                    i === keypressLogCopy.length - 1 ?
-                        Math.min(t1, ...partiallyProcessed.map(p => p[2])) :
-                        Math.min(
-                            t1,
-                            keypressLogCopy[i + 1][1],
-                            ...partiallyProcessed.map(p => p[2])
-                        );
-                const thisDt = nextT0 - t0;
-                let thisDir = controllerKeys.get(key);
-                for (let j = 0; j < partiallyProcessed.length; ++j) {
-                    thisDir = thisDir.add(
-                        controllerKeys.get(partiallyProcessed[j][0])
-                    );
-                }
-                thisDir = thisDir.normalize();
-                const thisAccel =
-                    thisDir.scalarMult(player.appForce / player.mass);
-                player.vel = player.vel.add(thisAccel.scalarMult(thisDt));
-                /* jshint loopfunc: true */
-                partiallyProcessed =
-                    partiallyProcessed
-                        .filter(p => p[2] > nextT0)
-                        .map(([k, , t]) => [k, nextT0, t]);
-                /* jshint loopfunc: false */
-                if (t1 > nextT0) {
-                    partiallyProcessed.push([key, nextT0, t1]);
-                }
-            }
-            if (keypressLogCopyOrig === null) {
-                keypressLogCopyOrig = keypressLogCopy;
-            }
-            keypressLogCopy = partiallyProcessed;
-            partiallyProcessed = [];
-        } while (keypressLogCopy.length > 0);
 
         // Update position based on new velocity.
         player.pos = player.pos.add(player.vel.scalarMult(dt));

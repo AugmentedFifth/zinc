@@ -154,6 +154,7 @@ hello = B.pack [0x05, 0x58, 0xe6, 0x39, 0x0a, 0xc4, 0x13, 0x24]
 infixr 5 *+
 (*+) :: Monoid a => a -> a -> a
 (*+) = mappend
+{-# INLINE (*+) #-}
 
 uuidToReadableBs :: UUID -> ByteString
 uuidToReadableBs = BC.pack . UID.toString
