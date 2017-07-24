@@ -16,13 +16,17 @@ Main.game = (canvas, ctx, ws) => {
 
     // Game state.
     const player = new Player(
-        v2(randInt(100, Main.width - 100), randInt(100, Main.height - 100)),
+        v2(50, 50),
         12,
         3e-2,
         1e-3,
         48
     );
+
     let keypressLog = [];
+    let movementSendCounter = 0;
+    const waitingForConfirmation = new Map();
+
     const color = getRand([
         "#914882",
         "#6a4891",
@@ -36,6 +40,11 @@ Main.game = (canvas, ctx, ws) => {
         "#afafaf",
     ]);
 
+    // Sending initial game-start "hello".
+    const hereIsMyGameInfoBytes = [0x02];
+    hexRgbToBytes(color).forEach(b => hereIsMyGameInfoBytes.push(b));
+    ws.send(new Uint8Array(hereIsMyGameInfoBytes).buffer);
+
     // Generating button data.
     const _mainCallback = Main.getTransition(
         "game",
@@ -44,7 +53,8 @@ Main.game = (canvas, ctx, ws) => {
         eventListeners
     );
     const mainCallback = () => {
-        // TODO: Tell server that player is leaving.
+        // Tell server that player is leaving.
+        ws.send(new Uint8Array([0x04]).buffer);
         _mainCallback();
     };
 
@@ -65,6 +75,12 @@ Main.game = (canvas, ctx, ws) => {
         ["a", v2(-1, 0)],
         ["s", v2(0,  1)],
         ["d", v2(1,  0)],
+    ]);
+    const controllerKeyIndices = new Map([
+        ["w", 0x00],
+        ["a", 0x01],
+        ["s", 0x02],
+        ["d", 0x03],
     ]);
 
     const _keydown = e => {
@@ -200,7 +216,25 @@ Main.game = (canvas, ctx, ws) => {
             player.pos.x = 0;
         }
 
-        // TODO: Send inputs to server.
+        // Saving calculated position to be confirmed by server later.
+        waitingForConfirmation.set(movementSendCounter, player.pos.clone());
+
+        // Send inputs to server.
+        const hereAreMyMovementsBytes = [0x03];
+        const pushByte = b => hereAreMyMovementsBytes.push(b);
+        i32ToBytes(movementSendCounter).forEach(pushByte);
+        movementSendCounter++;
+        for (let i = 0; i < keypressLogCopy.length; ++i) {
+            const [t, key, down] = keypressLogCopy[i];
+            f64ToBytes(t).forEach(pushByte);
+            pushByte(controllerKeyIndices.get(key));
+            if (down) {
+                pushByte(0x01);
+            } else {
+                pushByte(0x00);
+            }
+        }
+        ws.send(new Uint8Array(hereAreMyMovementsBytes).buffer);
 
         // TODO: Interpolate other client positions.
 

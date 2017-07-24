@@ -40,6 +40,7 @@ Main.newGame = (canvas, ctx, ws) => {
         , [rect(240, 380, 800, 45), "", false, 32]
         ];
 
+    let gameName;
     let alertText = [];
 
     const wrongLength =
@@ -76,6 +77,7 @@ Main.newGame = (canvas, ctx, ws) => {
                 2,
                 eventListeners
             );
+            Main.currGame = gameName;
             startGameCallback();
         }
     };
@@ -98,10 +100,14 @@ Main.newGame = (canvas, ctx, ws) => {
         }
 
         const createNewGameBytes = [0x01];
-        for (const [ , text] of formBoxes) {
+        for (let i = 0; i < formBoxes.length; ++i) {
+            const text = formBoxes[i][1];
             createNewGameBytes.push(text.length);
-            for (const char of text) {
-                createNewGameBytes.push(char.charCodeAt());
+            for (let j = 0; j < text.length; ++j) {
+                createNewGameBytes.push(text.charCodeAt(j));
+            }
+            if (i === 1) {
+                gameName = text;
             }
         }
 

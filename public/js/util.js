@@ -1092,6 +1092,52 @@ function u8ArrayToAscii(u8arr) {
     return s;
 }
 
+/**
+ * Turns a 32-bit integer into an array (`Uint8Array`) of bytes.
+ *
+ * @param {number} n
+ * @return {Uint8Array}
+ */
+function i32ToBytes(n) {
+    "use strict";
+    const bytes = new Uint8Array(4);
+    for (let i = 0; i < 4; ++i) {
+        bytes[i] = n & 0xFF;
+        n >>= 8;
+    }
+    return bytes;
+}
+
+/**
+ * Turns a 64-bit floating point number into an array (`Uint8Array`) of bytes.
+ *
+ * @param {number} n
+ * @return {Uint8Array}
+ */
+function f64ToBytes(n) {
+    "use strict";
+    const buf = new ArrayBuffer(8);
+    const arr = new Float64Array(buf);
+    arr[0] = n;
+    return new Uint8Array(buf);
+}
+
+/**
+ * Turns a hexadecimal `string` representation of an RGB color (e.g. `#e5b90a`)
+ * into a byte array.
+ *
+ * @param {string} color
+ * @return {Uint8Array}
+ */
+function hexRgbToBytes(color) {
+    "use strict";
+    const arr = new Uint8Array(3);
+    arr[0] = parseInt(color.slice(1, 3), 16);
+    arr[1] = parseInt(color.slice(3, 5), 16);
+    arr[2] = parseInt(color.slice(5),    16);
+    return arr;
+}
+
 
 /* ========================| Event handling |======================== */
 

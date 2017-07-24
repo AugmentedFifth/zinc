@@ -16,7 +16,6 @@ function Player(pos, mass, appForce, friction, side) {
     this.appForce = appForce;
     this.pos = pos;
     this.vel = V2.zero();
-    this.accel = V2.zero();
     this.friction = friction;
     this.side = side;
 }
