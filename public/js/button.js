@@ -72,11 +72,11 @@ function drawButtons(ctx,
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillStyle = textBgPattern;
-        const yOffset = -4; // Magic number lmao
+        //const yOffset = 270 / box.height; // Magic number lmao
         ctx.fillText(
             text,
             box.x + box.width / 2,
-            box.y + box.height / 2 + yOffset
+            box.y + box.height / 2 //+ yOffset
         );
         if (outline) {
             ctx.strokeStyle = "rgba(144, 144, 144, 0.5)";
@@ -84,7 +84,7 @@ function drawButtons(ctx,
             ctx.strokeText(
                 text,
                 box.x + box.width / 2,
-                box.y + box.height / 2 + yOffset
+                box.y + box.height / 2 //+ yOffset
             );
         }
     });

@@ -103,13 +103,6 @@ Main.game = (canvas, ctx, ws) => {
     window.addEventListener("keyup", _keyup);
     eventListeners.register(window, "keyup", _keyup);
 
-    // dat GUI.
-    const datGui = new dat.GUI();
-    datGui.add(player, "mass", 1, 48);
-    datGui.add(player, "appForce", 8e-3, 8e-2);
-    datGui.add(player, "friction", 4e-4, 6e-3);
-    datGui.add(player, "side", 2, 128);
-
     // Game main loop.
     function aboutPage(displacement, dt) {
         // Fill in the background.
@@ -222,13 +215,13 @@ Main.game = (canvas, ctx, ws) => {
         // Send inputs to server.
         const hereAreMyMovementsBytes = [0x03];
         const pushByte = b => hereAreMyMovementsBytes.push(b);
-        i32ToBytes(movementSendCounter).forEach(pushByte);
+        Main.data.i32ToBytes(movementSendCounter).forEach(pushByte); // 4
         movementSendCounter++;
         for (let i = 0; i < keypressLogCopy.length; ++i) {
             const [t, key, down] = keypressLogCopy[i];
-            f64ToBytes(t).forEach(pushByte);
-            pushByte(controllerKeyIndices.get(key));
-            if (down) {
+            Main.data.f64ToBytes(t).forEach(pushByte); // 12
+            pushByte(controllerKeyIndices.get(key)); // 13
+            if (down) { // 14
                 pushByte(0x01);
             } else {
                 pushByte(0x00);

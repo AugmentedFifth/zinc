@@ -1065,32 +1065,61 @@ function bezier2(p0, p1, p2, t) {
 
 
 /**
+ * Checks if the machine this is running on is big endian. If this returns
+ * `false`, we can assume little endian.
+ *
+ * @return {boolean}
+ */
+function isBigEndian() {
+    "use strict";
+    const buf = new ArrayBuffer(2);
+    const u8Arr = new Uint8Array(buf);
+    const u16Arr = new Uint16Array(buf);
+    u8Arr[0] = 0xAA;
+    u8Arr[1] = 0xBB;
+    return u16Arr[0] === 0xAABB;
+}
+
+/**
+ * Wraps byte-level operations so that they can be done irrespective of the
+ * client machine's endianness, implicitly converting all results of such
+ * operations to little endian (as the majority of clients will be little
+ * endian).
+ *
+ * @return {Data}
+ */
+function Data() {
+    "use strict";
+    this.isBigEndian = isBigEndian();
+}
+
+/**
  * Takes in an `ArrayBuffer` and returns a `string` that is the result of
  * interpreting the `ArrayBuffer`'s data as ASCII encoded text.
  *
  * @param {ArrayBuffer} buffer
  * @return {string}
  */
-function bufferToAscii(buffer) {
+Data.prototype.bufferToAscii = function(buffer) {
     "use strict";
     return u8ArrayToAscii(new Uint8Array(buffer));
-}
+};
 
 /**
  * Like `bufferToAscii()`, but takes in a `Uint8Array` for use when the view
  * already exists.
  *
- * @param {Uint8Array} u8arr
+ * @param {Uint8Array} u8Arr
  * @return {string}
  */
-function u8ArrayToAscii(u8arr) {
+Data.prototype.u8ArrayToAscii = function(u8Arr) {
     "use strict";
     let s = "";
-    for (let i = 0; i < u8arr.length; ++i) {
-        s += String.fromCharCode(u8arr[i]);
+    for (let i = 0; i < u8Arr.length; ++i) {
+        s += String.fromCharCode(u8Arr[i]);
     }
     return s;
-}
+};
 
 /**
  * Turns a 32-bit integer into an array (`Uint8Array`) of bytes.
@@ -1098,7 +1127,7 @@ function u8ArrayToAscii(u8arr) {
  * @param {number} n
  * @return {Uint8Array}
  */
-function i32ToBytes(n) {
+Data.prototype.i32ToBytes = function(n) {
     "use strict";
     const bytes = new Uint8Array(4);
     for (let i = 0; i < 4; ++i) {
@@ -1106,7 +1135,7 @@ function i32ToBytes(n) {
         n >>= 8;
     }
     return bytes;
-}
+};
 
 /**
  * Turns a 64-bit floating point number into an array (`Uint8Array`) of bytes.
@@ -1114,13 +1143,16 @@ function i32ToBytes(n) {
  * @param {number} n
  * @return {Uint8Array}
  */
-function f64ToBytes(n) {
+Data.prototype.f64ToBytes = function(n) {
     "use strict";
     const buf = new ArrayBuffer(8);
     const arr = new Float64Array(buf);
     arr[0] = n;
+    if (this.isBigEndian) {
+        return new Uint8Array(buf).reverse();
+    }
     return new Uint8Array(buf);
-}
+};
 
 /**
  * Turns a hexadecimal `string` representation of an RGB color (e.g. `#e5b90a`)
@@ -1129,14 +1161,14 @@ function f64ToBytes(n) {
  * @param {string} color
  * @return {Uint8Array}
  */
-function hexRgbToBytes(color) {
+Data.prototype.hexRgbToBytes = function(color) {
     "use strict";
     const arr = new Uint8Array(3);
     arr[0] = parseInt(color.slice(1, 3), 16);
     arr[1] = parseInt(color.slice(3, 5), 16);
     arr[2] = parseInt(color.slice(5),    16);
     return arr;
-}
+};
 
 
 /* ========================| Event handling |======================== */

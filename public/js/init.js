@@ -3,6 +3,7 @@ const Main = {
     currentLoops: new Map([["mainMenu", V2.zero()]]),
     wsRecvCallback: null,
     lastLoop: 0,
+    data: new Data(),
     width: 1280,
     height: 720,
     canvasRect: rect(0, 0, 1280, 720),
@@ -34,6 +35,9 @@ const Main = {
 
 Main.init = () => {
     "use strict";
+
+    // Disabling right mouse button to make gameplay less error-prone.
+    document.addEventListener("contextmenu", e => e.preventDefault(), false);
 
     // Initializing `canvas` context.
     const canvas = document.getElementById("canvas");
