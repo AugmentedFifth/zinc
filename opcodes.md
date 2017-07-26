@@ -6,6 +6,7 @@
 |--------------|-----------------------------------------|
 | `0x00`       | This is a list of active games/servers. |
 | `0x01`       | New game request accepted/denied.       |
+| `0x02`       | Here's the state of the game.           |
 
 ## *recv* opcodes (client -> server)
 

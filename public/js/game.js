@@ -215,13 +215,15 @@ Main.game = (canvas, ctx, ws) => {
         // Send inputs to server.
         const hereAreMyMovementsBytes = [0x03];
         const pushByte = b => hereAreMyMovementsBytes.push(b);
-        Main.data.i32ToBytes(movementSendCounter).forEach(pushByte); // 4
+        Main.data.i32ToBytes(movementSendCounter).forEach(pushByte);
         movementSendCounter++;
+        Main.data.f64ToBytes(now).forEach(pushByte);
+        Main.data.f64ToBytes(dt).forEach(pushByte);
         for (let i = 0; i < keypressLogCopy.length; ++i) {
             const [t, key, down] = keypressLogCopy[i];
-            Main.data.f64ToBytes(t).forEach(pushByte); // 12
-            pushByte(controllerKeyIndices.get(key)); // 13
-            if (down) { // 14
+            Main.data.f64ToBytes(t).forEach(pushByte);
+            pushByte(controllerKeyIndices.get(key));
+            if (down) {
                 pushByte(0x01);
             } else {
                 pushByte(0x00);

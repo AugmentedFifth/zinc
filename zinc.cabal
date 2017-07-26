@@ -16,8 +16,11 @@ cabal-version:      >= 1.10
 library
   hs-source-dirs:     server/lib
   exposed-modules:    ZincServer
+                    , ZincData
   build-depends:      base            >= 4.7      && < 5
+                    , binary-strict   >= 0.4.8.3  && < 0.5
                     , bytestring      >= 0.9.1    && < 0.11
+                    , cereal          >= 0.5.4.0  && < 0.6
                     , containers      >= 0.5.10   && < 0.6
                     , lens            >= 4.15.3   && < 5
                     , linear          >= 1.20.6   && < 1.22
@@ -32,14 +35,15 @@ library
   default-language:   Haskell2010
 
 executable zinc
-  hs-source-dirs:     server/main
-  main-is:            Main.hs
-  ghc-options:        -O2 -funbox-strict-fields -threaded -rtsopts "-with-rtsopts=-N" -Wall -fprint-unicode-syntax -fwarn-tabs
+  hs-source-dirs:       server/main
+  main-is:              Main.hs
+  default-extensions:   Strict
+  ghc-options:          -O2 -funbox-strict-fields -threaded -rtsopts "-with-rtsopts=-N" -Wall -fprint-unicode-syntax -fwarn-tabs
 
-  build-depends:      base >= 4.7 && < 5
-                    , zinc
+  build-depends:        base >= 4.7 && < 5
+                      , zinc
 
-  default-language:   Haskell2010
+  default-language:     Haskell2010
 
 source-repository head
   type:     git
