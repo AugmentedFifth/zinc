@@ -12,47 +12,13 @@
 --   Maintainer  : zcomito@gmail.com
 --   Stability   : experimental
 --   Portability : POSIX
-module ZincData
-    ( -- * Data/type definitions
-      Client
-    , Key
-    , Input
-    , Color
-    , PlayerState
-    , GameState
-    , Game
-    , GameRegistry
-    , ClientRegistry
-    , -- * Lenses
-      uuid
-    , connection
-    , username
-    , currGame
-    , timeStamp
-    , key
-    , isDown
-    , ordinal
-    , now
-    , dt
-    , inputs
-    , pos
-    , vel
-    , color
-    , inputQueue
-    , lastOrdinal
-    , gameName
-    , players
-    , gameState
-    , physicsLoopId
-    , broadcastLoopId
-    ) where
+module ZincData where
 
 import           Control.Concurrent            (ThreadId)
 import           Control.Concurrent.STM
 import           Control.Lens.Getter           ((^.))
 import           Control.Lens.Lens             (Lens', lens)
 
-import qualified Data.Binary.Strict.Get        as BG
 import           Data.Bits                     ((.&.))
 import           Data.ByteString               (ByteString)
 import qualified Data.ByteString               as B
@@ -60,6 +26,7 @@ import qualified Data.ByteString.Char8         as BC
 import           Data.Map.Strict               (Map)
 import           Data.Ratio                    ((%))
 import           Data.Sequence                 (Seq)
+import qualified Data.Serialize.Get            as BG
 import           Data.UUID                     (UUID)
 import qualified Data.UUID                     as UID
 import           Data.Word                     (Word32, Word8)
@@ -175,7 +142,7 @@ instance Num Color where
 
 instance Enum Color where
     fromEnum (Color r g b) =
-        let (Right w32, _) = BG.runGet BG.getWord32le (B.pack [r, g, b, 0])
+        let Right w32 = BG.runGet BG.getWord32le (B.pack [r, g, b, 0])
         in  fromIntegral w32
     {-# INLINE fromEnum #-}
     toEnum i = Color (fromIntegral $ i .&. 0x0000FF)
@@ -217,7 +184,7 @@ instance Integral Color where
         in  (Color rq gq bq, Color rr gr br)
     {-# INLINE quotRem #-}
     toInteger (Color r g b) =
-        let (Right w32, _) = BG.runGet BG.getWord32le (B.pack [r, g, b, 0])
+        let Right w32 = BG.runGet BG.getWord32le (B.pack [r, g, b, 0])
         in  toInteger w32
     {-# INLINE toInteger #-}
 

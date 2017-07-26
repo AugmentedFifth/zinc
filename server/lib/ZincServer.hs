@@ -66,33 +66,32 @@ module ZincServer
     ) where
 
 import           Control.Applicative           (pure, (<|>))
-import           Control.Arrow
-import           Control.Concurrent            (ThreadId, forkIO, killThread,
+import           Control.Concurrent            (forkIO, killThread,
                                                 threadDelay)
 import           Control.Concurrent.STM
 import           Control.Exception             (finally, throwIO)
 import           Control.Lens.Getter           ((^.))
-import           Control.Lens.Lens             (Lens', lens, (&))
 import           Control.Lens.Setter           (ASetter, (%~), (.~))
 import           Control.Monad                 (forever, unless, void)
 
-import qualified Data.Binary.Strict.Get        as BG
 import           Data.ByteString               (ByteString)
 import qualified Data.ByteString               as B
-import qualified Data.ByteString.Char8         as BC
-import           Data.Foldable                 (foldl', sequence_)
-import           Data.Map.Strict               (Map, (!?))
+import           Data.ByteString.Lazy          (toStrict)
+import           Data.Foldable                 (foldl')
+import           Data.Function                 ((&))
+import           Data.Map.Strict               ((!?))
 import qualified Data.Map.Strict               as Map
-import           Data.Maybe                    (fromJust, isNothing)
-import           Data.Sequence                 (Seq, (|>))
+import           Data.Maybe                    (fromJust)
+import           Data.Sequence                 (Seq, (<|), (|>))
 import qualified Data.Sequence                 as Seq
+import qualified Data.Serialize.Get            as BG
 import           Data.Serialize.IEEE754        (getFloat64le, putFloat64le)
 import qualified Data.Serialize.Put            as BP
 import qualified Data.Set                      as Set
 import           Data.UUID                     (UUID)
 import qualified Data.UUID                     as UID
 import           Data.UUID.V4
-import           Data.Word                     (Word32, Word8)
+import           Data.Word                     (Word8)
 
 import           Linear.Epsilon
 import           Linear.Metric
@@ -105,7 +104,7 @@ import           Network.WebSockets.Snap
 
 import           Prelude                       hiding (return, ($))
 
-import           Snap.Core
+import           Snap.Core                     hiding (dir)
 import           Snap.Http.Server
 import           Snap.Util.FileServe
 
@@ -329,8 +328,8 @@ parseColor s =
 
 parseInput :: ByteString -> (# Maybe Input, ByteString #)
 parseInput s =
-    case BG.runGet getInput s of
-        (Right (# timeStamp', key', isDown' #), t) ->
+    case BG.runGetState getInput s 0 of
+        Right ((timeStamp', key', isDown'), t) ->
             (# Just $ Input
                    { _timeStamp = timeStamp'
                    , _key       = getKey key'
@@ -338,13 +337,13 @@ parseInput s =
                    }
             ,  t
             #)
-        (_, t) -> (# Nothing, t #)
+        _ -> (# Nothing, s #)
   where
     getInput = do
         timeStamp' <- getFloat64le
         key'       <- BG.getWord8
         isDown'    <- BG.getWord8
-        pure (# timeStamp', key', isDown' #)
+        pure (timeStamp', key', isDown')
 
     getKey k =
         case k of
@@ -352,6 +351,7 @@ parseInput s =
             1 -> V2 (-1) 0
             2 -> V2 0    1
             3 -> V2 1    0
+            _ -> V2 0    0
 
 parseInputs :: ByteString -> Seq Input
 parseInputs s =
@@ -362,7 +362,7 @@ parseInputs s =
 parseInputGroup :: ByteString -> Maybe InputGroup
 parseInputGroup s =
     case maybeHeader of
-        Just (# ordinal', now', dt', t #) ->
+        Just (ordinal', now', dt', t) ->
             Just $ InputGroup
                 { _ordinal = ordinal'
                 , _now     = now'
@@ -371,16 +371,16 @@ parseInputGroup s =
                 }
         _ -> Nothing
   where
-    maybeHeader = case BG.runGet getInputHeader s of
-        (Right (# ordinal', now', dt' #), t) ->
-            Just (# ordinal', now', dt', t #)
+    maybeHeader = case BG.runGetState getInputHeader s 0 of
+        Right ((ordinal', now', dt'), t) ->
+            Just (ordinal', now', dt', t)
         _ ->
             Nothing
     getInputHeader = do
         ordinal' <- BG.getWord32le
         now'     <- getFloat64le
         dt'      <- getFloat64le
-        pure (# ordinal', now', dt' #)
+        pure (ordinal', now', dt')
 
 serializeGameState :: Game -> ByteString
 serializeGameState game =
@@ -392,7 +392,7 @@ serializeGameState game =
             Color r g b = ps^.color
         in  mappend accu $ BP.runPut $
             do
-                BP.putByteString $ UID.toByteString (client^.uuid)
+                BP.putByteString $ toStrict $ UID.toByteString (client^.uuid)
                 putFloat64le px
                 putFloat64le py
                 putFloat64le vx
@@ -409,44 +409,44 @@ applyInputs :: PlayerState -> PlayerState
 applyInputs ps =
     foldl' (\ps' inputGroup ->
         -- Calculate accelerations for this frame based on input log.
-        let (# v, pressed, _, t_ #) = foldl' (\(# v, pressed, t0', t_ #) inp ->
+        let (v', pressed', _, t_') = foldl' (\(v, pressed, t0', t_) inp ->
                 let t1 = inp^.timeStamp
                     down = inp^.isDown
-                in  (# case t0' of
-                           Just t0 -> let thisDt = t1 - t0 in
-                               if thisDt > 0 then
-                                   let dir = (normalize . sum) pressed
-                                   in  v + dir ^* (appForce / mass * thisDt)
-                               else
-                                   v
-                           _ -> v
-                    ,  (down ? Set.insert $ Set.delete) (inp^.key) pressed
-                    ,  Just t1
-                    ,  if down then case t0' of
-                           Just _ -> Just t_
-                           _      -> Just t1
-                       else
-                           Just t_
-                    #)
-                ) (# ps'^.vel, Set.empty, Nothing, Nothing #)
+                in  ( case t0' of
+                          Just t0 -> let thisDt = t1 - t0 in
+                              if thisDt > 0 then
+                                  let dir = (normalize . sum) pressed
+                                  in  v + dir ^* (appForce / mass * thisDt)
+                              else
+                                  v
+                          _ -> v
+                    , (down ? Set.insert $ Set.delete) (inp^.key) pressed
+                    , Just t1
+                    , if down then case t0' of
+                          Just _ -> t_
+                          _      -> Just t1
+                      else
+                          t_
+                    )
+                ) (ps'^.vel, Set.empty, Nothing, Nothing)
                   (inputGroup^.inputs)
-            leftoverDir = (normalize . sum) pressed
-            v' = if nullV leftoverDir then
-                     v
-                 else let thisDt = (inputGroup^.now) - t_ in
-                     v + leftoverDir ^* (appForce / mass * thisDt)
+            leftoverDir = (normalize . sum) pressed'
+            v'' = if nullV leftoverDir then
+                     v'
+                 else let thisDt = (inputGroup^.now) - fromJust t_' in
+                     v' + leftoverDir ^* (appForce / mass * thisDt)
             -- Apply frictional forces.
             dt' = inputGroup^.dt
-            v'' = let frictionalDvNorm = -friction * dt'
-                  in if nullV v' || abs frictionalDvNorm >= norm v' then
+            v''' = let frictionalDvNorm = -friction * dt'
+                  in if nullV v'' || abs frictionalDvNorm >= norm v'' then
                       zero
                   else
-                      v' + normalize v' ^* frictionalDvNorm
+                      v'' + normalize v'' ^* frictionalDvNorm
             -- Update position based on new velocity.
-            pos' = (ps'^.pos) + v'' ^* dt'
+            pos' = (ps'^.pos) + v''' ^* dt'
             -- Collision detection.
-            (# v''', pos'' #) =
-                let V2 vx vy = v''
+            (# v'''', pos'' #) =
+                let V2 vx vy = v'''
                     V2 px py = pos'
                     (# vy', py' #) = if
                         | py <= 0                 -> -vy # 0
@@ -458,7 +458,7 @@ applyInputs ps =
                         | otherwise               ->  vx # px
                 in  V2 vx' vy' # V2 px' py'
         in  ps' & pos         .~ pos''
-                & vel         .~ v'''
+                & vel         .~ v''''
                 & lastOrdinal %~ (max (inputGroup^.ordinal))
     ) ps (ps^.inputQueue) & inputQueue .~ Seq.empty
 
@@ -468,8 +468,8 @@ physicsLoop game' = forever $ do
     atomically $ modifyTVar' game' (& players %~ Map.map applyInputs)
 {-# INLINE physicsLoop #-}
 
-broadcastLoop :: ByteString -> TVar Game -> IO ()
-broadcastLoop name game' = forever $ do
+broadcastLoop :: TVar Game -> IO ()
+broadcastLoop game' = forever $ do
     threadDelay 45000
     game <- readTVarIO game'
     let s = serializeGameState game
@@ -481,8 +481,9 @@ gameMainLoop :: TVar Game -> IO ()
 gameMainLoop game' = do
     physicsLoopId'   <- forkIO $ physicsLoop   game'
     broadcastLoopId' <- forkIO $ broadcastLoop game'
-    atomically $ modifyTVar' game' (& physicsLoopId   .~ Just physicsLoopId'
-                                    & broadcastLoopId .~ Just broadcastLoopId')
+    atomically $ modifyTVar' game' (\game ->
+        game & physicsLoopId   .~ Just physicsLoopId'
+             & broadcastLoopId .~ Just broadcastLoopId')
 {-# INLINE gameMainLoop #-}
 
 sendGameList :: TVar GameRegistry -> Client -> IO ()
@@ -548,7 +549,7 @@ handleGameOp opcode msg client gameReg = do
     games <- readTVarIO gameReg
     case games !? (client^.currGame) of
         Just game' -> case opcode of
-            2 -> setGameInfo client (B.tail msg) game'
+            2 -> setGameInfo  client (B.tail msg) game'
             3 -> handleInputs client (B.tail msg) game'
             _ -> pure ()
         _ -> pure ()
@@ -569,7 +570,7 @@ commLoop conn clientReg gameReg uid = forever $ do
                  else
                      registerNewGame clientReg gameReg client (B.tail msg)
             4 -> removeFromGame client gameReg
-            n -> forkIO $ handleGameOp n msg client gameReg
+            n -> void $ forkIO $ handleGameOp n msg client gameReg
         _ -> throwIO $ mkIOError
                  doesNotExistErrorType
                  ("Could not find client with UUID " ++
@@ -592,12 +593,12 @@ webSocketConnect clientReg gameReg pending = do
         print newUuid
 
         let client = newClient newUuid conn
-        let disconnect = atomically $ do
-                clients <- readTVar clientReg
+        let disconnect = do
+                clients <- readTVarIO clientReg
                 case clients !? newUuid of
                     Just client' -> removeFromGame client' gameReg
                     _            -> pure ()
-                modifyTVar' clientReg (Map.delete newUuid)
+                modifyTVarIO clientReg (Map.delete newUuid)
 
         flip finally disconnect $ do
             atomically $ modifyTVar' clientReg $ addClient client
