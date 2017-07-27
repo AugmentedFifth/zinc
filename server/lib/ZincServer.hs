@@ -36,12 +36,6 @@ module ZincServer
     , newClient
     , newPlayerState
     , newGame
-    , numClients
-    , clientExists
-    , isInGame
-    , addClient
-    , removeFromGame
-    , createNewGame
     , -- * Data handling functions
       parseByteString
     , parseColor
@@ -50,7 +44,11 @@ module ZincServer
     , parseInputGroup
     , serializeGameState
     , -- * Primary functions
-      applyInputs
+      isInGame
+    , addClient
+    , removeFromGame
+    , createNewGame
+    , applyInputs
     , physicsLoop
     , broadcastLoop
     , gameMainLoop
@@ -76,7 +74,6 @@ import           Control.Monad                 (forever, unless, void)
 
 import           Data.ByteString               (ByteString)
 import qualified Data.ByteString               as B
-import           Data.ByteString.Lazy          (toStrict)
 import           Data.Foldable                 (foldl')
 import           Data.Function                 ((&))
 import           Data.Map.Strict               ((!?))
@@ -238,6 +235,7 @@ newPlayerState = PlayerState
     , _inputQueue  = Seq.empty
     , _lastOrdinal = 0
     }
+{-# INLINE newPlayerState #-}
 
 newGame :: ByteString -> Client -> Game
 newGame name host = Game
@@ -248,60 +246,6 @@ newGame name host = Game
     , _broadcastLoopId = Nothing
     }
 {-# INLINE newGame #-}
-
-numClients :: TVar ClientRegistry -> IO Int
-numClients clientReg = readTVarIO clientReg >>= pure . Map.size
-{-# INLINE numClients #-}
-
-clientExists :: Client -> TVar ClientRegistry -> IO Bool
-clientExists client clientReg =
-    readTVarIO clientReg >>= pure . Map.member (client^.uuid)
-{-# INLINE clientExists #-}
-
-isInGame :: Client -> Bool
-isInGame client = (not . B.null) (client^.currGame)
-{-# INLINE isInGame #-}
-
-addClient :: Client -> ClientRegistry -> ClientRegistry
-addClient client = Map.insert (client^.uuid) client
-{-# INLINE addClient #-}
-
-removeFromGame :: Client -> TVar GameRegistry -> IO ()
-removeFromGame client gameReg = do
-    let name = client^.currGame
-    games <- readTVarIO gameReg
-    case games !? name of
-        Just game' -> do
-            game <- readTVarIO game'
-            if Map.size (game^.players) < 2 then do
-                -- We're removing the last player, so just get rid of the
-                -- whole game.
-                case game^.physicsLoopId of
-                    Just threadId -> killThread threadId
-                    _             -> pure ()
-                case game^.broadcastLoopId of
-                    Just threadId -> killThread threadId
-                    _             -> pure ()
-                modifyTVarIO gameReg (Map.delete name)
-            else
-                -- Just remove the client from the game's player set.
-                modifyTVarIO game' (& players %~ Map.delete client)
-        _ -> pure ()
-{-# INLINE removeFromGame #-}
-
-createNewGame :: Client ->
-                 ByteString ->
-                 TVar ClientRegistry ->
-                 TVar GameRegistry ->
-                 IO (TVar Game)
-createNewGame host name clientReg gameReg = do
-    let host' = host & currGame .~ name
-    removeFromGame host' gameReg
-    atomically $ do
-        modifyTVar' clientReg (addClient host')
-        game <- newTVar $ newGame name host'
-        modifyTVar' gameReg (Map.insert name game)
-        pure game
 
 -- * Data handling functions
 
@@ -390,9 +334,11 @@ serializeGameState game =
         let V2 px py = ps^.pos
             V2 vx vy = ps^.vel
             Color r g b = ps^.color
+            username' = client^.username
         in  mappend accu $ BP.runPut $
             do
-                BP.putByteString $ toStrict $ UID.toByteString (client^.uuid)
+                BP.putWord8 $ fromIntegral $ B.length username'
+                BP.putByteString username'
                 putFloat64le px
                 putFloat64le py
                 putFloat64le vx
@@ -403,6 +349,51 @@ serializeGameState game =
                 BP.putWord32le $ ps^.lastOrdinal
 
 -- * Primary functions
+
+isInGame :: Client -> Bool
+isInGame client = (not . B.null) (client^.currGame)
+{-# INLINE isInGame #-}
+
+addClient :: Client -> ClientRegistry -> ClientRegistry
+addClient client = Map.insert (client^.uuid) client
+{-# INLINE addClient #-}
+
+removeFromGame :: Client -> TVar GameRegistry -> IO ()
+removeFromGame client gameReg = do
+    let name = client^.currGame
+    games <- readTVarIO gameReg
+    case games !? name of
+        Just game' -> do
+            game <- readTVarIO game'
+            if Map.size (game^.players) < 2 then do
+                -- We're removing the last player, so just get rid of the
+                -- whole game.
+                case game^.physicsLoopId of
+                    Just threadId -> killThread threadId
+                    _             -> pure ()
+                case game^.broadcastLoopId of
+                    Just threadId -> killThread threadId
+                    _             -> pure ()
+                modifyTVarIO gameReg (Map.delete name)
+            else
+                -- Just remove the client from the game's player set.
+                modifyTVarIO game' (& players %~ Map.delete client)
+        _ -> pure ()
+{-# INLINE removeFromGame #-}
+
+createNewGame :: Client ->
+                 ByteString ->
+                 TVar ClientRegistry ->
+                 TVar GameRegistry ->
+                 IO (TVar Game)
+createNewGame host name clientReg gameReg = do
+    let host' = host & currGame .~ name
+    removeFromGame host' gameReg
+    atomically $ do
+        modifyTVar' clientReg (addClient host')
+        game <- newTVar $ newGame name host'
+        modifyTVar' gameReg (Map.insert name game)
+        pure game
 
 -- | what
 applyInputs :: PlayerState -> PlayerState

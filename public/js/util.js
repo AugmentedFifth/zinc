@@ -22,6 +22,22 @@ Set.prototype.foldl = function(fold, seed) {
     return seed;
 };
 
+/**
+ * Clears the keys in a `Map` that are equal to or less than the specified key.
+ *
+ * @template K
+ * @param {K} n
+ * @return {void}
+ */
+Map.prototype.clearKeysUpTo = function(n) {
+    "use strict";
+    this.forEach((v, k) => {
+        if (k <= n) {
+            this.delete(k);
+        }
+    });
+};
+
 
 /* ================| Circular buffer implementation |================ */
 

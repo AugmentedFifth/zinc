@@ -72,7 +72,7 @@ Main.init = () => {
     });
 
     ws.addEventListener("message", data => {
-        console.log("WebSocket recv:", data);
+        //console.log("WebSocket recv:", data);
         if (!Main.uuid) {
             Main.uuid = data.data;
             if (Main.uuid.byteLength !== 16) {

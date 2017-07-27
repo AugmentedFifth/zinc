@@ -35,7 +35,7 @@ import           Linear.V2                     (V2)
 
 import qualified Network.WebSockets.Connection as WS
 
-import           Prelude                       hiding (pi)
+import           Prelude                       hiding (pi, return, ($))
 
 
 -- * Data/type definitions
@@ -133,9 +133,9 @@ instance Num Color where
     {-# INLINE abs #-}
     signum (Color r g b) = Color (signum r) (signum g) (signum b)
     {-# INLINE signum #-}
-    fromInteger i = Color (fromIntegral $ i .&. 0x0000FF)
-                          (fromIntegral $ i .&. 0x00FF00)
-                          (fromIntegral $ i .&. 0xFF0000)
+    fromInteger i = Color (fromIntegral $! i .&. 0x0000FF)
+                          (fromIntegral $! i .&. 0x00FF00)
+                          (fromIntegral $! i .&. 0xFF0000)
     {-# INLINE fromInteger #-}
     negate (Color r g b) = Color (negate r) (negate g) (negate b)
     {-# INLINE negate #-}
@@ -145,9 +145,9 @@ instance Enum Color where
         let Right w32 = BG.runGet BG.getWord32le (B.pack [r, g, b, 0])
         in  fromIntegral w32
     {-# INLINE fromEnum #-}
-    toEnum i = Color (fromIntegral $ i .&. 0x0000FF)
-                     (fromIntegral $ i .&. 0x00FF00)
-                     (fromIntegral $ i .&. 0xFF0000)
+    toEnum i = Color (fromIntegral $! i .&. 0x0000FF)
+                     (fromIntegral $! i .&. 0x00FF00)
+                     (fromIntegral $! i .&. 0xFF0000)
     {-# INLINE toEnum #-}
 
 instance Ord Color where

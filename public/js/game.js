@@ -15,18 +15,6 @@ Main.game = (canvas, ctx, ws) => {
     const buttonBgPattern = ctx.createPattern(buttonBg, "repeat");
 
     // Game state.
-    const player = new Player(
-        v2(50, 50),
-        12,
-        3e-2,
-        1e-3,
-        48
-    );
-
-    let keypressLog = [];
-    let movementSendCounter = 0;
-    const waitingForConfirmation = new Map();
-
     const color = getRand([
         "#914882",
         "#6a4891",
@@ -39,10 +27,32 @@ Main.game = (canvas, ctx, ws) => {
         "#7c5e52",
         "#afafaf",
     ]);
+    const player = new Player(
+        v2(50, 50),
+        12,
+        3e-2,
+        1e-3,
+        48,
+        color
+    );
+    const playerShadow = new Player(
+        v2(50, 50),
+        12,
+        3e-2,
+        1e-3,
+        48,
+        color
+    );
+
+    let keypressLog = [];
+    let movementSendCounter = 0;
+    const waitingForConfirmation = new Map();
 
     // Sending initial game-start "hello".
     const hereIsMyGameInfoBytes = [0x02];
-    hexRgbToBytes(color).forEach(b => hereIsMyGameInfoBytes.push(b));
+    Main.data.hexRgbToBytes(player.color).forEach(
+        b => hereIsMyGameInfoBytes.push(b)
+    );
     ws.send(new Uint8Array(hereIsMyGameInfoBytes).buffer);
 
     // Generating button data.
@@ -65,6 +75,9 @@ Main.game = (canvas, ctx, ws) => {
     const screwAngles =
         new Float64Array(buttons.length * 4)
             .map(() => Math.PI * Math.random());
+
+    // Font size to display usernames.
+    const usernameFontSize = 16; // pixels
 
     // Resistering mouse state.
     const mouseState = registerMouse(canvas, eventListeners, buttons);
@@ -102,6 +115,103 @@ Main.game = (canvas, ctx, ws) => {
     };
     window.addEventListener("keyup", _keyup);
     eventListeners.register(window, "keyup", _keyup);
+
+    // Info on other players.
+    const otherPlayers = new Map();
+    let recvCount = 0;
+    let lastRecv, recvDtAvg;
+    let lastRecvDt;
+
+    // Server interaction.
+    Main.wsRecvCallback = data => {
+        const now = window.performance.now();
+        recvCount++;
+        if (lastRecv !== undefined) {
+            const recvDt = now - lastRecv;
+            if (recvDtAvg !== undefined) {
+                recvDtAvg = (recvDtAvg * (recvCount - 1) + recvDt) / recvCount;
+            } else {
+                recvDtAvg = recvDt;
+            }
+            lastRecvDt = recvDt;
+        }
+        lastRecv = now;
+
+        const bytes = new Uint8Array(data.data);
+        if (bytes[0] !== 0x02) {
+            console.log(
+                `Bad packet. Expecting leading 0x02 byte, got: ${bytes}`
+            );
+            return;
+        }
+        const view = new DataView(data.data, 1);
+        let offset = 0;
+        while (offset < view.byteLength) {
+            try {
+                const nameLen = view.getUint8(offset);
+                offset++;
+                let name = "";
+                for (let j = 0; j < nameLen; ++j) {
+                    name += String.fromCharCode(view.getUint8(offset));
+                    offset++;
+                }
+                const isOtherPlayer = name !== Main.username;
+                const px = view.getFloat64(offset, true);
+                offset += 8;
+                const py = view.getFloat64(offset, true);
+                offset += 8;
+                const vx = view.getFloat64(offset, true);
+                offset += 8;
+                const vy = view.getFloat64(offset, true);
+                offset += 8;
+                const red = view.getUint8(offset).toString(16);
+                offset++;
+                const green = view.getUint8(offset).toString(16);
+                offset++;
+                const blue = view.getUint8(offset).toString(16);
+                offset++;
+                const lastOrdinal = view.getUint32(offset, true);
+                offset += 4;
+                if (isOtherPlayer) {
+                    if (otherPlayers.has(name)) {
+                        const otherPlayer = otherPlayers.get(name);
+                        otherPlayer.pushPos(v2(px, py));
+                        otherPlayer.pushVel(v2(vx, vy));
+                        otherPlayer.color = `#${red}${green}${blue}`;
+                    } else {
+                        const otherPlayer = new Player(
+                            v2(px, py),
+                            12,
+                            3e-2,
+                            1e-3,
+                            48,
+                            `#${red}${green}${blue}`
+                        );
+                        otherPlayer.vel = v2(vx, vy);
+                        otherPlayers.set(name, otherPlayer);
+                    }
+                } else {
+                    playerShadow.pushPos(v2(px, py));
+                    playerShadow.pushVel(v2(vx, vy));
+                    playerShadow.color = `#${red}${green}${blue}`;
+                    const toConfirm = waitingForConfirmation.get(lastOrdinal);
+                    if (toConfirm !== undefined) {
+                        const diff = v2(px, py).sub(toConfirm);
+                        player.addPos(diff);
+                    }
+                    waitingForConfirmation.clearKeysUpTo(lastOrdinal);
+                }
+            } catch (e) {
+                console.log(
+                    "Wrong byte length. Offset:",
+                    offset,
+                    "bytes:",
+                    bytes.slice(1)
+                );
+                break;
+            }
+        }
+    };
 
     // Game main loop.
     function aboutPage(displacement, dt) {
@@ -236,8 +346,37 @@ Main.game = (canvas, ctx, ws) => {
         // Draw player.
         ctx.save();
 
-        ctx.fillStyle = color;
+        ctx.fillStyle = player.color;
         ctx.fillRect(player.pos.x, player.pos.y, player.side, player.side);
+        // Drawing player name.
+        ctx.font = `${usernameFontSize}px 'Noto Sans', sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "alphabetic";
+        ctx.fillStyle = "#ccc";
+        ctx.fillText(
+            Main.username,
+            player.pos.x + player.side / 2,
+            player.pos.y + player.side + usernameFontSize
+        );
+
+        ctx.restore();
+
+        // Drawing player shadow based on server side data for testing.
+        ctx.save();
+
+        if (recvDtAvg !== undefined && lastRecv !== undefined) {
+            const recvDt = window.performance.now() - lastRecv;
+            playerShadow.lerp(recvDt, lastRecvDt);
+        }
+
+        ctx.fillStyle = playerShadow.color;
+        ctx.globalCompositeOperation = "screen";
+        ctx.fillRect(
+            playerShadow.lerpPos.x,
+            playerShadow.lerpPos.y,
+            playerShadow.side,
+            playerShadow.side
+        );
 
         ctx.restore();
 

@@ -40,7 +40,7 @@ Main.newGame = (canvas, ctx, ws) => {
         , [rect(240, 380, 800, 45), "", false, 32]
         ];
 
-    let gameName;
+    let gameName, username;
     let alertText = [];
 
     const wrongLength =
@@ -77,6 +77,7 @@ Main.newGame = (canvas, ctx, ws) => {
                 2,
                 eventListeners
             );
+            Main.username = username;
             Main.currGame = gameName;
             startGameCallback();
         }
@@ -106,7 +107,9 @@ Main.newGame = (canvas, ctx, ws) => {
             for (let j = 0; j < text.length; ++j) {
                 createNewGameBytes.push(text.charCodeAt(j));
             }
-            if (i === 1) {
+            if (i === 0) {
+                username = text;
+            } else {
                 gameName = text;
             }
         }
