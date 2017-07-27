@@ -395,6 +395,24 @@ createNewGame host name clientReg gameReg = do
         modifyTVar' gameReg (Map.insert name game)
         pure game
 
+processJoinGame :: Client ->
+                   ByteString ->
+                   TVar ClientRegistry ->
+                   TVar GameRegistry ->
+                   IO ()
+processJoinGame joiner name clientReg gameReg = do
+    removeFromGame joiner gameReg
+    let joiner' = joiner & currGame .~ name
+    atomically $ do
+        modifyTVar' clientReg (addClient joiner')
+        games <- readTVar gameReg
+        case games !? name of
+            Just game' ->
+                modifyTVar' game'
+                    (& players %~ (Map.insert joiner' newPlayerState))
+            _ ->
+                pure ()
+
 -- | what
 applyInputs :: PlayerState -> PlayerState
 applyInputs ps =
@@ -472,9 +490,9 @@ gameMainLoop :: TVar Game -> IO ()
 gameMainLoop game' = do
     physicsLoopId'   <- forkIO $ physicsLoop   game'
     broadcastLoopId' <- forkIO $ broadcastLoop game'
-    atomically $ modifyTVar' game' (\game ->
+    atomically $ modifyTVar' game' $ \game ->
         game & physicsLoopId   .~ Just physicsLoopId'
-             & broadcastLoopId .~ Just broadcastLoopId')
+             & broadcastLoopId .~ Just broadcastLoopId'
 {-# INLINE gameMainLoop #-}
 
 sendGameList :: TVar GameRegistry -> Client -> IO ()
@@ -514,6 +532,37 @@ registerNewGame clientReg gameReg host msg =
                     WS.sendBinaryData conn zero'
   where
     conn = host^.connection
+    parsed = parseByteString msg
+    invalidString s = B.length s < 2 || B.any (\w -> w < 32 || w > 126) s
+    zero' = "\x01\x00" :: ByteString
+    one   = "\x01\x01" :: ByteString
+    two   = "\x01\x02" :: ByteString
+    three = "\x01\x03" :: ByteString
+
+joinGame :: TVar ClientRegistry ->
+            TVar GameRegistry ->
+            Client ->
+            ByteString ->
+            IO ()
+joinGame clientReg gameReg joiner msg =
+    if length parsed /= 2 || any invalidString parsed then
+        WS.sendBinaryData conn one
+    else let (# newUsername, toJoin #) = parsed ! 0 # parsed ! 1 in
+        if B.length newUsername > 24 then
+            WS.sendBinaryData conn two
+        else do
+            let sameUsername client = client^.username == newUsername
+            clients <- readTVarIO clientReg
+            games   <- readTVarIO gameReg
+            if | any sameUsername clients     -> WS.sendBinaryData conn two
+               | toJoin `Map.notMember` games -> WS.sendBinaryData conn three
+               | otherwise -> do
+                    -- print toJoin
+                    let joiner' = joiner & username .~ newUsername
+                    processJoinGame joiner' toJoin clientReg gameReg
+                    WS.sendBinaryData conn zero'
+  where
+    conn = joiner^.connection
     parsed = parseByteString msg
     invalidString s = B.length s < 2 || B.any (\w -> w < 32 || w > 126) s
     zero' = "\x01\x00" :: ByteString
@@ -561,6 +610,10 @@ commLoop conn clientReg gameReg uid = forever $ do
                  else
                      registerNewGame clientReg gameReg client (B.tail msg)
             4 -> removeFromGame client gameReg
+            5 -> if isInGame client then
+                     pure ()
+                 else
+                     joinGame clientReg gameReg client (B.tail msg)
             n -> void $ forkIO $ handleGameOp n msg client gameReg
         _ -> throwIO $ mkIOError
                  doesNotExistErrorType

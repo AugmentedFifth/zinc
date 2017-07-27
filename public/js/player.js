@@ -67,13 +67,7 @@ Player.prototype.pushVel = function(newVel) {
  * @param {number} dt
  * @return {void}
  */
-Player.prototype.lerp = function(t1, dt) {
+Player.prototype.lerp = function(ratio) {
     "use strict";
-    const avgAccel = this.vel.sub(this.lastVel).scalarDiv(dt);
-    this.lerpPos = // x(t) = (1/2)*a*t^2 + v_0*t + x_0
-        avgAccel.scalarMult(0.5 * t1 * t1)
-                .add(this.lastVel.scalarMult(t1))
-                .add(this.lastPos);
-    this.lerpVel = // v(t) = at + v_0
-        avgAccel.scalarMult(t1).add(this.lastVel);
+    this.lerpPos = this.pos.scalarMult(ratio).add(this.lastPos.scalarMult(1 - ratio));
 };

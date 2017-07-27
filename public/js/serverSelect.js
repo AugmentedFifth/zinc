@@ -123,6 +123,35 @@ Main.serverSelect = (canvas, ctx, ws) => {
     }
     requestServerList();
 
+    // Add functionality to server list items.
+    const _clickServerName = e => {
+        const boundingRect = canvas.getBoundingClientRect();
+        const clickPos = v2(
+            e.clientX - boundingRect.left,
+            e.clientY - boundingRect.top
+        );
+
+        if (Main.currentLoops.size !== 1) {
+            return;
+        }
+        const hoveredServerName = serverListRects.find(([ , box]) =>
+            box.contains(clickPos)
+        );
+        if (hoveredServerName) {
+            Main.serverToJoinName = hoveredServerName[0];
+            doRequestServerList = false;
+            Main.wsRecvCallback = null;
+            Main.getTransition(
+                "serverSelect",
+                "joinGame",
+                3,
+                eventListeners
+            )();
+        }
+    };
+    canvas.addEventListener("click", _clickServerName);
+    eventListeners.register(canvas, "click", _clickServerName);
+
     // Server select menu main loop.
     function serverSelect(displacement, dt) {
         // Fill in the background.

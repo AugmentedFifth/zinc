@@ -146,6 +146,7 @@ Main.game = (canvas, ctx, ws) => {
         }
         const view = new DataView(data.data, 1);
         let offset = 0;
+        const playersSeen = new Set();
         while (offset < view.byteLength) {
             try {
                 const nameLen = view.getUint8(offset);
@@ -190,6 +191,7 @@ Main.game = (canvas, ctx, ws) => {
                         otherPlayer.vel = v2(vx, vy);
                         otherPlayers.set(name, otherPlayer);
                     }
+                    playersSeen.add(name);
                 } else {
                     playerShadow.pushPos(v2(px, py));
                     playerShadow.pushVel(v2(vx, vy));
@@ -206,11 +208,18 @@ Main.game = (canvas, ctx, ws) => {
                     "Wrong byte length. Offset:",
                     offset,
                     "bytes:",
-                    bytes.slice(1)
+                    bytes.slice(1),
+                    e
                 );
                 break;
             }
         }
+
+        otherPlayers.forEach((otherPlayer, name) => {
+            if (!playersSeen.has(name)) {
+                otherPlayers.delete(name);
+            }
+        });
     };
 
     // Game main loop.
@@ -341,8 +350,6 @@ Main.game = (canvas, ctx, ws) => {
         }
         ws.send(new Uint8Array(hereAreMyMovementsBytes).buffer);
 
-        // TODO: Interpolate other client positions.
-
         // Draw player.
         ctx.save();
 
@@ -362,11 +369,12 @@ Main.game = (canvas, ctx, ws) => {
         ctx.restore();
 
         // Drawing player shadow based on server side data for testing.
+        /*
         ctx.save();
 
         if (recvDtAvg !== undefined && lastRecv !== undefined) {
             const recvDt = window.performance.now() - lastRecv;
-            playerShadow.lerp(recvDt, lastRecvDt);
+            playerShadow.lerp(Math.min(Math.max(recvDt / recvDtAvg, 0), 1));
         }
 
         ctx.fillStyle = playerShadow.color;
@@ -379,8 +387,39 @@ Main.game = (canvas, ctx, ws) => {
         );
 
         ctx.restore();
+        */
 
-        // TODO: Draw other players.
+        // Draw other players.
+        //console.log(otherPlayers);
+        otherPlayers.forEach((p, name) => {
+            ctx.save();
+
+            if (recvDtAvg !== undefined && lastRecv !== undefined) {
+                const recvDt = window.performance.now() - lastRecv;
+                p.lerp(Math.min(Math.max(recvDt / recvDtAvg, 0), 1));
+            }
+
+            ctx.fillStyle = p.color;
+            ctx.fillRect(
+                p.lerpPos.x,
+                p.lerpPos.y,
+                p.side,
+                p.side
+            );
+
+            // Drawing player name.
+            ctx.font = `${usernameFontSize}px 'Noto Sans', sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "alphabetic";
+            ctx.fillStyle = "#ccc";
+            ctx.fillText(
+                name,
+                p.lerpPos.x + p.side / 2,
+                p.lerpPos.y + p.side + usernameFontSize
+            );
+
+            ctx.restore();
+        });
 
         // Draw mouse trail.
         drawMouseTrail(ctx, mouseState);
