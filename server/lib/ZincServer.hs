@@ -218,6 +218,11 @@ modifyTVarIO :: TVar a -> (a -> a) -> IO ()
 modifyTVarIO x' f = atomically $ modifyTVar' x' f
 {-# INLINE modifyTVarIO #-}
 
+invalidString :: Int -> ByteString -> Bool
+invalidString minLen s =
+    B.length s < minLen || B.any (\w -> w < 32 || w > 126) s
+{-# INLINE invalidString #-}
+
 newClient :: UUID -> WS.Connection -> Client
 newClient uid conn = Client
     { _uuid       = uid
@@ -515,7 +520,7 @@ registerNewGame :: TVar ClientRegistry ->
                    ByteString ->
                    IO ()
 registerNewGame clientReg gameReg host msg =
-    if length parsed /= 2 || any invalidString parsed then
+    if length parsed /= 2 || any (invalidString 2) parsed then
         WS.sendBinaryData conn one
     else let (# newUsername, newGameName #) = parsed ! 0 # parsed ! 1 in if
         | B.length newUsername > 24 -> WS.sendBinaryData conn two
@@ -535,7 +540,6 @@ registerNewGame clientReg gameReg host msg =
   where
     conn = host^.connection
     parsed = parseByteString msg
-    invalidString s = B.length s < 2 || B.any (\w -> w < 32 || w > 126) s
     zero' = "\x01\x00" :: ByteString
     one   = "\x01\x01" :: ByteString
     two   = "\x01\x02" :: ByteString
@@ -547,7 +551,7 @@ joinGame :: TVar ClientRegistry ->
             ByteString ->
             IO ()
 joinGame clientReg gameReg joiner msg =
-    if length parsed /= 2 || any invalidString parsed then
+    if length parsed /= 2 || any (invalidString 2) parsed then
         WS.sendBinaryData conn one
     else let (# newUsername, toJoin #) = parsed ! 0 # parsed ! 1 in
         if B.length newUsername > 24 then
@@ -566,7 +570,6 @@ joinGame clientReg gameReg joiner msg =
   where
     conn = joiner^.connection
     parsed = parseByteString msg
-    invalidString s = B.length s < 2 || B.any (\w -> w < 32 || w > 126) s
     zero' = "\x01\x00" :: ByteString
     one   = "\x01\x01" :: ByteString
     two   = "\x01\x02" :: ByteString
@@ -586,15 +589,30 @@ handleInputs client msg game' =
         Nothing     -> pure ()
 {-# INLINE handleInputs #-}
 
+sendChat :: Client -> ByteString -> TVar Game -> IO ()
+sendChat client msg game' =
+    if B.length msg > 96 || invalidString 1 msg then
+        pure ()
+    else do
+        let clientName = client^.username
+        let nameLength = (fromIntegral . B.length) clientName
+        let msg' = B.cons 3 (B.cons nameLength clientName) *+ msg
+        let sendPacket client' _ = WS.sendBinaryData (client'^.connection) msg'
+        game <- readTVarIO game'
+        void $ Map.traverseWithKey sendPacket (game^.players)
+
 handleGameOp :: Word8 -> ByteString -> Client -> TVar GameRegistry -> IO ()
 handleGameOp opcode msg client gameReg = do
     games <- readTVarIO gameReg
     case games !? (client^.currGame) of
         Just game' -> case opcode of
-            2 -> setGameInfo  client (B.tail msg) game'
-            3 -> handleInputs client (B.tail msg) game'
+            2 -> setGameInfo  client messageBody game'
+            3 -> handleInputs client messageBody game'
+            6 -> sendChat     client messageBody game'
             _ -> pure ()
         _ -> pure ()
+  where
+    messageBody = B.tail msg
 
 commLoop :: WS.Connection ->
             TVar ClientRegistry ->

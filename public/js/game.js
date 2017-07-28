@@ -38,6 +38,7 @@ Main.game = (canvas, ctx, ws) => {
         48,
         color
     );
+    /*
     const playerShadow = new Player(
         v2(50, 50),
         12,
@@ -46,6 +47,7 @@ Main.game = (canvas, ctx, ws) => {
         48,
         color
     );
+    */
 
     let keypressLog = [];
     let movementSendCounter = 0;
@@ -133,7 +135,7 @@ Main.game = (canvas, ctx, ws) => {
     // Resistering mouse state.
     const mouseState = registerMouse(canvas, eventListeners, buttons);
 
-    // Player controls.
+    // Player control buttons.
     const controllerKeys = new Map([
         ["w", v2(0, -1)],
         ["a", v2(-1, 0)],
@@ -147,21 +149,34 @@ Main.game = (canvas, ctx, ws) => {
         ["d", 0x03],
     ]);
 
+    // In-game chat.
+    const chatHandler = new ChatHandler(
+        eventListeners,
+        ws,
+        x => keypressLog.push(x),
+        controllerKeyIndices
+    );
+
+    // Player controls.
     const _keydown = e => {
-        const now = window.performance.now();
-        const key = e.key.toLowerCase();
-        if (controllerKeys.has(key)) {
-            keypressLog.push([now, key, true]);
+        if (!chatHandler.active) {
+            const now = window.performance.now();
+            const key = e.key.toLowerCase();
+            if (controllerKeys.has(key)) {
+                keypressLog.push([now, key, true]);
+            }
         }
     };
     window.addEventListener("keydown", _keydown);
     eventListeners.register(window, "keydown", _keydown);
 
     const _keyup = e => {
-        const now = window.performance.now();
-        const key = e.key.toLowerCase();
-        if (controllerKeys.has(key)) {
-            keypressLog.push([now, key, false]);
+        if (!chatHandler.active) {
+            const now = window.performance.now();
+            const key = e.key.toLowerCase();
+            if (controllerKeys.has(key)) {
+                keypressLog.push([now, key, false]);
+            }
         }
     };
     window.addEventListener("keyup", _keyup);
@@ -189,12 +204,42 @@ Main.game = (canvas, ctx, ws) => {
         lastRecv = now;
 
         const bytes = new Uint8Array(data.data);
-        if (bytes[0] !== 0x02) {
+        if (bytes[0] !== 0x02 && bytes[0] !== 0x03) {
             console.log(
-                `Bad packet. Expecting leading 0x02 byte, got: ${bytes}`
+                "Bad packet. Expecting leading 0x02 or 0x03 byte, " +
+                    `got: ${bytes}`
             );
             return;
         }
+
+        // Chat packet handling.
+        if (bytes[0] === 0x03) {
+            const nameLength = bytes[1];
+            let name = "";
+            let offset = 2;
+            for (let i = 0; i < nameLength; ++i) {
+                name += String.fromCharCode(bytes[offset]);
+                offset++;
+            }
+
+            if (name !== Main.username && !otherPlayers.has(name)) {
+                console.log(
+                    `Chat packet from absent player "${name}": ${bytes}`
+                );
+                return;
+            }
+
+            let chatMsg = "";
+            while (offset < bytes.length) {
+                chatMsg += String.fromCharCode(bytes[offset]);
+                offset++;
+            }
+
+            chatHandler.addChatBubble(name, chatMsg);
+
+            return;
+        }
+
         const view = new DataView(data.data, 1);
         let offset = 0;
         const playersSeen = new Set();
@@ -244,9 +289,9 @@ Main.game = (canvas, ctx, ws) => {
                     }
                     playersSeen.add(name);
                 } else {
-                    playerShadow.pushPos(v2(px, py));
-                    playerShadow.pushVel(v2(vx, vy));
-                    playerShadow.color = `#${red}${green}${blue}`;
+                    //playerShadow.pushPos(v2(px, py));
+                    //playerShadow.pushVel(v2(vx, vy));
+                    //playerShadow.color = `#${red}${green}${blue}`;
                     const toConfirm = waitingForConfirmation.get(lastOrdinal);
                     if (toConfirm !== undefined) {
                         const diff = v2(px, py).sub(toConfirm);
@@ -280,6 +325,28 @@ Main.game = (canvas, ctx, ws) => {
         ctx.fillStyle = darkBgPattern;
         ctx.fillRect(0, 0, Main.width, Main.height);
         ctx.restore();
+
+        // Chat box GUI.
+        if (chatHandler.active) {
+            // Draw text.
+            ctx.font = "18px 'Source Code Pro', monospace";
+            ctx.textAlign = "left";
+            ctx.fillStyle = "#9ab";
+            ctx.fillText(chatHandler.text, 24, Main.height - 24);
+
+            // Draw cursor.
+            chatHandler.incrementCursorTime(dt);
+            if (chatHandler.cursorTime > chatHandler.cursorPeriod / 2) {
+                const textWidth = ctx.measureText(chatHandler.text).width;
+                ctx.fillStyle = "rgba(212, 212, 212, 0.5)";
+                ctx.fillRect(
+                    textWidth + 25,
+                    Main.height - 28 + 3,
+                    12,
+                    18 - 16
+                );
+            }
+        }
 
         // Draw modal if necessary.
         if (promptOpen) {
@@ -513,6 +580,52 @@ Main.game = (canvas, ctx, ws) => {
 
             ctx.restore();
         });
+
+        // Chat bubbles.
+        ctx.save();
+
+        ctx.font = "18px 'Source Code Pro', monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "alphabetic";
+        ctx.fillStyle = "#9ab";
+
+        chatHandler.newFrame().forEach(([ , msg], playerName) => {
+            const textPos = (() => {
+                if (playerName === Main.username) {
+                    return v2(
+                        player.pos.x + player.side / 2,
+                        player.pos.y - 6
+                    );
+                } else {
+                    const otherPlayer = otherPlayers.get(playerName);
+                    if (otherPlayer === undefined) {
+                        console.log(
+                            `Chat from absent player "${playerName}": ${msg}`
+                        );
+                        return;
+                    }
+                    return v2(
+                        otherPlayer.lerpPos.x + otherPlayer.side / 2,
+                        otherPlayer.lerpPos.y - 6
+                    );
+                }
+            })();
+
+            if (textPos === undefined) {
+                return;
+            }
+
+            const split = chatHandler.splitMsg(msg);
+            split.forEach((line, i) => {
+                ctx.fillText(
+                    line,
+                    textPos.x,
+                    textPos.y - (split.length - 1 - i) * 21
+                );
+            });
+        });
+
+        ctx.restore();
 
         // Draw mouse trail.
         drawMouseTrail(ctx, mouseState);

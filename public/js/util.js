@@ -1,3 +1,5 @@
+/* =============| Extending prototypes of built-in objects |============= */
+
 /**
  * Custom implementation of `Array.prototype.toString()`.
  *
@@ -33,6 +35,31 @@ Map.prototype.clearKeysUpTo = function(n) {
     "use strict";
     this.forEach((v, k) => {
         if (k <= n) {
+            this.delete(k);
+        }
+    });
+};
+
+/**
+ * Filters elements of this `Map` **in place**.
+ *
+ * Predicate takes up to 3 params:
+ *
+ * 1. The key.
+ * 2. The value.
+ * 3. `this`, the `Map` object being filtered through.
+ *
+ * Returns `this`, **not** a new `Map`.
+ *
+ * @template K - The type of the keys in this map.
+ * @template V - The type of values in this map.
+ * @param {function} f - Filtering predicate.
+ * @return {Map<K, V>} - `this`
+ */
+Map.prototype.filter = function(f) {
+    "use strict";
+    this.forEach((v, k, this_) => {
+        if (!f(k, v, this_)) {
             this.delete(k);
         }
     });
