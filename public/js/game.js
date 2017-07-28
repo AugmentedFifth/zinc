@@ -14,6 +14,9 @@ Main.game = (canvas, ctx, ws) => {
     const buttonBg = document.getElementById("grey-linen-pattern");
     const buttonBgPattern = ctx.createPattern(buttonBg, "repeat");
 
+    const naturalBlack = document.getElementById("natural-black-pattern");
+    const naturalBlackPattern = ctx.createPattern(naturalBlack, "repeat");
+
     // Game state.
     const color = getRand([
         "#914882",
@@ -56,6 +59,14 @@ Main.game = (canvas, ctx, ws) => {
     ws.send(new Uint8Array(hereIsMyGameInfoBytes).buffer);
 
     // Generating button data.
+    let promptOpen = false;
+    const modalBoxRect = rect(
+        Main.width / 2 - 180,
+        Main.height / 2 - 120,
+        360,
+        240
+    );
+
     const _mainCallback = Main.getTransition(
         "game",
         "mainMenu",
@@ -63,13 +74,53 @@ Main.game = (canvas, ctx, ws) => {
         eventListeners
     );
     const mainCallback = () => {
-        // Tell server that player is leaving.
-        ws.send(new Uint8Array([0x04]).buffer);
-        _mainCallback();
+        if (promptOpen) {
+            // Tell server that player is leaving.
+            ws.send(new Uint8Array([0x04]).buffer);
+
+            _mainCallback();
+        }
     };
+    const mainPromptCallback  = () => promptOpen = true;
+    const closePromptCallback = () => promptOpen = false;
+
+    const _modalClick = e => {
+        if (!promptOpen) {
+            return;
+        }
+
+        const boundingRect = canvas.getBoundingClientRect();
+        const clickPos = v2(
+            e.clientX - boundingRect.left,
+            e.clientY - boundingRect.top
+        );
+
+        if (Main.currentLoops.size !== 1) {
+            return;
+        }
+        if (!modalBoxRect.contains(clickPos)) {
+            promptOpen = false;
+        }
+    };
+    canvas.addEventListener("click", _modalClick);
+    eventListeners.register(canvas, "click", _modalClick);
 
     const buttons =
-        [ [rect(1155, 660, 114, 50), 5, "main", mainCallback]
+        [ [ rect(1155, 660, 114, 50)
+          , 5
+          , "main"
+          , mainPromptCallback
+          ]
+        , [ rect(Main.width / 2 - 35 - 114, 400, 114, 50)
+          , 5
+          , "no"
+          , closePromptCallback
+          ]
+        , [ rect(Main.width / 2 + 35, 400, 114, 50)
+          , 5
+          , "yes"
+          , mainCallback
+          ]
         ];
 
     const screwAngles =
@@ -230,11 +281,53 @@ Main.game = (canvas, ctx, ws) => {
         ctx.fillRect(0, 0, Main.width, Main.height);
         ctx.restore();
 
+        // Draw modal if necessary.
+        if (promptOpen) {
+            ctx.save();
+            // Modal background.
+            ctx.fillStyle = "rgba(0, 0, 0, 0.36)";
+            ctx.fillRect(0, 0, Main.width, Main.height);
+
+            // Modal box.
+            ctx.fillStyle = naturalBlackPattern;
+            ctx.fillRect(
+                modalBoxRect.x,
+                modalBoxRect.y,
+                modalBoxRect.width,
+                modalBoxRect.height
+            );
+            ctx.strokeStyle = "#aaa";
+            ctx.strokeRect(
+                modalBoxRect.x,
+                modalBoxRect.y,
+                modalBoxRect.width,
+                modalBoxRect.height
+            );
+
+            // Modal text.
+            ctx.font = "28px 'Noto Sans', sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "alphabetic";
+            ctx.fillStyle = "#ccc";
+            ctx.fillText(
+                "are you sure you want",
+                Main.width / 2,
+                Main.height / 2 - 70
+            );
+            ctx.fillText(
+                "to leave the game?",
+                Main.width / 2,
+                Main.height / 2 - 32
+            );
+
+            ctx.restore();
+        }
+
         // Draw buttons.
         drawButtons(
             ctx,
             mouseState,
-            buttons,
+            promptOpen ? buttons : buttons.slice(0, 1),
             buttonBgPattern,
             textBgPattern,
             screwAngles,

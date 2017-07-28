@@ -358,7 +358,7 @@ addClient :: Client -> ClientRegistry -> ClientRegistry
 addClient client = Map.insert (client^.uuid) client
 {-# INLINE addClient #-}
 
-removeFromGame :: Client -> TVar GameRegistry -> IO ()
+removeFromGame :: Client -> TVar GameRegistry -> IO Client
 removeFromGame client gameReg = do
     let name = client^.currGame
     games <- readTVarIO gameReg
@@ -379,6 +379,7 @@ removeFromGame client gameReg = do
                 -- Just remove the client from the game's player set.
                 modifyTVarIO game' (& players %~ Map.delete client)
         _ -> pure ()
+    pure $ client & currGame .~ ""
 {-# INLINE removeFromGame #-}
 
 createNewGame :: Client ->
@@ -387,11 +388,11 @@ createNewGame :: Client ->
                  TVar GameRegistry ->
                  IO (TVar Game)
 createNewGame host name clientReg gameReg = do
-    let host' = host & currGame .~ name
-    removeFromGame host' gameReg
+    host' <- removeFromGame host gameReg
+    let host'' = host' & currGame .~ name
     atomically $ do
-        modifyTVar' clientReg (addClient host')
-        game <- newTVar $ newGame name host'
+        modifyTVar' clientReg (addClient host'')
+        game <- newTVar $ newGame name host''
         modifyTVar' gameReg (Map.insert name game)
         pure game
 
@@ -401,15 +402,15 @@ processJoinGame :: Client ->
                    TVar GameRegistry ->
                    IO ()
 processJoinGame joiner name clientReg gameReg = do
-    removeFromGame joiner gameReg
-    let joiner' = joiner & currGame .~ name
+    joiner' <- removeFromGame joiner gameReg
+    let joiner'' = joiner' & currGame .~ name
     atomically $ do
-        modifyTVar' clientReg (addClient joiner')
+        modifyTVar' clientReg (addClient joiner'')
         games <- readTVar gameReg
         case games !? name of
             Just game' ->
                 modifyTVar' game'
-                    (& players %~ (Map.insert joiner' newPlayerState))
+                    (& players %~ (Map.insert joiner'' newPlayerState))
             _ ->
                 pure ()
 
@@ -523,7 +524,8 @@ registerNewGame clientReg gameReg host msg =
             let sameUsername client = client^.username == newUsername
             clients <- readTVarIO clientReg
             games   <- readTVarIO gameReg
-            if | any sameUsername clients     -> WS.sendBinaryData conn two
+            if | host^.username /= newUsername && any sameUsername clients ->
+                    WS.sendBinaryData conn two
                | Map.member newGameName games -> WS.sendBinaryData conn three
                | otherwise -> do
                     let host' = host & username .~ newUsername
@@ -554,10 +556,10 @@ joinGame clientReg gameReg joiner msg =
             let sameUsername client = client^.username == newUsername
             clients <- readTVarIO clientReg
             games   <- readTVarIO gameReg
-            if | any sameUsername clients     -> WS.sendBinaryData conn two
+            if | joiner^.username /= newUsername && any sameUsername clients ->
+                    WS.sendBinaryData conn two
                | toJoin `Map.notMember` games -> WS.sendBinaryData conn three
                | otherwise -> do
-                    -- print toJoin
                     let joiner' = joiner & username .~ newUsername
                     processJoinGame joiner' toJoin clientReg gameReg
                     WS.sendBinaryData conn zero'
@@ -609,7 +611,8 @@ commLoop conn clientReg gameReg uid = forever $ do
                      pure ()
                  else
                      registerNewGame clientReg gameReg client (B.tail msg)
-            4 -> removeFromGame client gameReg
+            4 -> do  client' <- removeFromGame client gameReg
+                     modifyTVarIO clientReg (Map.insert uid client')
             5 -> if isInGame client then
                      pure ()
                  else
@@ -634,13 +637,12 @@ webSocketConnect clientReg gameReg pending = do
         WS.forkPingThread conn 30
         newUuid <- nextRandom
         WS.sendBinaryData conn $ UID.toByteString newUuid
-        print newUuid
 
         let client = newClient newUuid conn
         let disconnect = do
                 clients <- readTVarIO clientReg
                 case clients !? newUuid of
-                    Just client' -> removeFromGame client' gameReg
+                    Just client' -> void $ removeFromGame client' gameReg
                     _            -> pure ()
                 modifyTVarIO clientReg (Map.delete newUuid)
 

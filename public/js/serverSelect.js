@@ -119,11 +119,47 @@ Main.serverSelect = (canvas, ctx, ws) => {
             Main.wsRecvCallback = recvServerListCallback;
             ws.send(requestServerListPacket);
             window.setTimeout(requestServerList, 5000);
+            console.log("requested server list.");
         }
     }
     requestServerList();
 
     // Add functionality to server list items.
+    const joinGameConfirmCallback = data => {
+        const bytes = new Uint8Array(data.data);
+        if (bytes[0] !== 0x01) {
+            console.log(
+                `Bad packet. Expecting leading 0x01 byte, got: ${bytes}`
+            );
+            return;
+        }
+        if (bytes[1] === 1) {
+            alertText =
+                [ "An error has occured in joining the game."
+                , "Please try again later."
+                ];
+        } else if (bytes[1] === 2) {
+            alertText =
+                [ "It looks like someone else has that username already."
+                , "Change your name and try again."
+                ];
+        } else if (bytes[1] === 3) {
+            alertText =
+                [ "It looks like there's no such game with that name."
+                , "Please try again later."
+                ];
+        } else {
+            const joinGameCallback = Main.getTransition(
+                "joinGame",
+                "game",
+                2,
+                eventListeners
+            );
+            Main.currGame = Main.serverToJoinName;
+            joinGameCallback();
+        }
+    };
+
     const _clickServerName = e => {
         const boundingRect = canvas.getBoundingClientRect();
         const clickPos = v2(
@@ -139,14 +175,29 @@ Main.serverSelect = (canvas, ctx, ws) => {
         );
         if (hoveredServerName) {
             Main.serverToJoinName = hoveredServerName[0];
-            doRequestServerList = false;
-            Main.wsRecvCallback = null;
-            Main.getTransition(
-                "serverSelect",
-                "joinGame",
-                3,
-                eventListeners
-            )();
+            if (Main.username) {
+                const joinGameBytes = [0x05];
+                joinGameBytes.push(Main.username.length);
+                for (let i = 0; i < Main.username.length; ++i) {
+                    joinGameBytes.push(Main.username.charCodeAt(i));
+                }
+                joinGameBytes.push(Main.serverToJoinName.length);
+                for (let i = 0; i < Main.serverToJoinName.length; ++i) {
+                    joinGameBytes.push(Main.serverToJoinName.charCodeAt(i));
+                }
+
+                Main.wsRecvCallback = joinGameConfirmCallback;
+                ws.send(new Uint8Array(joinGameBytes).buffer);
+            } else {
+                doRequestServerList = false;
+                Main.wsRecvCallback = null;
+                Main.getTransition(
+                    "serverSelect",
+                    "joinGame",
+                    3,
+                    eventListeners
+                )();
+            }
         }
     };
     canvas.addEventListener("click", _clickServerName);

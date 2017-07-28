@@ -66,7 +66,7 @@ Main.joinGame = (canvas, ctx, ws) => {
                 ];
         } else if (bytes[1] === 3) {
             alertText =
-                [ "An unexpected error has occured in joining the game."
+                [ "It looks like there's no such game with that name."
                 , "Please try again later."
                 ];
         } else {
@@ -215,7 +215,7 @@ Main.joinGame = (canvas, ctx, ws) => {
         ctx.fillText(
             `game name: ${Main.serverToJoinName}`,
             Main.width / 2,
-            364
+            360
         );
         ctx.restore();
 

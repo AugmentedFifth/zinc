@@ -35,7 +35,9 @@ Main.newGame = (canvas, ctx, ws) => {
             .map(() => Math.PI * Math.random());
 
     // Form boxes to be typed into.
-    const formBoxes =
+    const formBoxes = Main.username ?
+        [ [rect(240, 380, 800, 45), "", false, 32]
+        ] :
         [ [rect(240, 230, 800, 45), "", false, 24]
         , [rect(240, 380, 800, 45), "", false, 32]
         ];
@@ -101,16 +103,31 @@ Main.newGame = (canvas, ctx, ws) => {
         }
 
         const createNewGameBytes = [0x01];
-        for (let i = 0; i < formBoxes.length; ++i) {
-            const text = formBoxes[i][1];
+        if (Main.username) {
+            createNewGameBytes.push(Main.username.length);
+            for (let j = 0; j < Main.username.length; ++j) {
+                createNewGameBytes.push(Main.username.charCodeAt(j));
+            }
+
+            const text = formBoxes[0][1];
             createNewGameBytes.push(text.length);
             for (let j = 0; j < text.length; ++j) {
                 createNewGameBytes.push(text.charCodeAt(j));
             }
-            if (i === 0) {
-                username = text;
-            } else {
-                gameName = text;
+            username = Main.username;
+            gameName = text;
+        } else {
+            for (let i = 0; i < formBoxes.length; ++i) {
+                const text = formBoxes[i][1];
+                createNewGameBytes.push(text.length);
+                for (let j = 0; j < text.length; ++j) {
+                    createNewGameBytes.push(text.charCodeAt(j));
+                }
+                if (i === 0) {
+                    username = text;
+                } else {
+                    gameName = text;
+                }
             }
         }
 
@@ -214,7 +231,11 @@ Main.newGame = (canvas, ctx, ws) => {
         ctx.font = "36px 'Noto Sans', sans-serif";
         ctx.textAlign = "center";
         ctx.fillStyle = "#777";
-        ctx.fillText("your name", Main.width / 2, 210);
+        if (Main.username) {
+            ctx.fillText(`your name: ${Main.username}`, Main.width / 2, 210);
+        } else {
+            ctx.fillText("your name", Main.width / 2, 210);
+        }
         ctx.fillText("game name", Main.width / 2, 360);
         ctx.restore();
 
