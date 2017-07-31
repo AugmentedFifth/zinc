@@ -16,11 +16,13 @@ function ChatHandler(eventListeners,
     const _chatKeydown = e => {
         if (this.active) {
             if (e.key === "Enter") {
-                const sendChatBytes = [0x06];
-                for (let i = 0; i < this.text.length; ++i) {
-                    sendChatBytes.push(this.text.charCodeAt(i));
+                if (this.text) {
+                    const sendChatBytes = [0x06];
+                    for (let i = 0; i < this.text.length; ++i) {
+                        sendChatBytes.push(this.text.charCodeAt(i));
+                    }
+                    ws.send(new Uint8Array(sendChatBytes).buffer);
                 }
-                ws.send(new Uint8Array(sendChatBytes).buffer);
                 this.active = false;
                 this.text = "";
             } else if (e.key === "Escape") {

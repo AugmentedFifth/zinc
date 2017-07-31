@@ -678,5 +678,5 @@ site clients games =
 main :: IO ()
 main = do
     clientReg <- atomically $ newTVar Map.empty
-    gameReg <- atomically $ newTVar Map.empty
+    gameReg   <- atomically $ newTVar Map.empty
     httpServe (setPort 3000 mempty) (site clientReg gameReg)

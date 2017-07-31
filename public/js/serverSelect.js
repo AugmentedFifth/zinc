@@ -149,8 +149,9 @@ Main.serverSelect = (canvas, ctx, ws) => {
                 , "Please try again later."
                 ];
         } else {
+            doRequestServerList = false;
             const joinGameCallback = Main.getTransition(
-                "joinGame",
+                "serverSelect",
                 "game",
                 2,
                 eventListeners

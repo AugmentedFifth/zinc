@@ -22,7 +22,7 @@ library
                     , cereal          >= 0.5.4.0  && < 0.6
                     , containers      >= 0.5.10   && < 0.6
                     , lens            >= 4.15.3   && < 5
-                    , linear          >= 1.20.6   && < 1.22
+                    , linear          >= 1.20.6   && < 1.3
                     , monad-control   >= 1.0      && < 1.1
                     , mtl             >= 2        && < 3
                     , snap-core       >= 1.0      && < 1.1
@@ -37,7 +37,7 @@ executable zinc
   hs-source-dirs:       server/main
   main-is:              Main.hs
   default-extensions:   Strict
-  ghc-options:          -O2 -funbox-strict-fields -threaded -rtsopts "-with-rtsopts=-N" -Wall -fprint-unicode-syntax -fwarn-tabs
+  ghc-options:          -O2 -funbox-strict-fields -threaded -rtsopts "-with-rtsopts=-N" -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates -Wmissing-import-lists -fprint-unicode-syntax -fwarn-tabs
 
   build-depends:        base >= 4.7 && < 5
                       , zinc

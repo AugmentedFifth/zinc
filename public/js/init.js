@@ -235,11 +235,11 @@ Main.init = () => {
         });
 
         // Unregister any locally registered loops that aren't current.
-        for (const loopId of registeredLoops.keys()) {
+        registeredLoops.forEach((loop, loopId) => {
             if (!Main.currentLoops.has(loopId)) {
                 registeredLoops.delete(loopId);
             }
-        }
+        });
     }
 
     // Start main game loop.
