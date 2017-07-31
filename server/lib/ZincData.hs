@@ -16,7 +16,6 @@ module ZincData where
 
 import           Control.Concurrent            (ThreadId)
 import           Control.Concurrent.STM
-import           Control.Lens.Getter           ((^.))
 import           Control.Lens.Lens             (Lens', lens)
 
 import           Data.Bits                     ((.&.))
@@ -91,35 +90,35 @@ type ClientRegistry = Map UUID Client
 -- * Instances
 
 instance Eq Client where
-    (==) c1 c2 = c1^.uuid == c2^.uuid
+    (==) c1 c2 = _uuid c1 == _uuid c2
     {-# INLINE (==) #-}
 
 instance Ord Client where
-    c1 <  c2 = (c1^.uuid) <  (c2^.uuid)
+    c1 <  c2 = _uuid c1 <  _uuid c2
     {-# INLINE (<) #-}
-    c1 <= c2 = (c1^.uuid) <= (c2^.uuid)
+    c1 <= c2 = _uuid c1 <= _uuid c2
     {-# INLINE (<=) #-}
-    c1 >  c2 = (c1^.uuid) >  (c2^.uuid)
+    c1 >  c2 = _uuid c1 >  _uuid c2
     {-# INLINE (>) #-}
-    c1 >= c2 = (c1^.uuid) >= (c2^.uuid)
+    c1 >= c2 = _uuid c1 >= _uuid c2
     {-# INLINE (>=) #-}
 
 instance Show Client where
     show c = "Client {"
-          ++ UID.toString (c^.uuid)
+          ++ UID.toString (_uuid c)
           ++ ", "
-          ++ BC.unpack (c^.username)
+          ++ BC.unpack (_username c)
           ++ "}"
     {-# INLINE show #-}
 
 instance Ord InputGroup where
-    i1 <  i2 = (i1^.ordinal) <  (i2^.ordinal)
+    i1 <  i2 = _ordinal i1 <  _ordinal i2
     {-# INLINE (<) #-}
-    i1 <= i2 = (i1^.ordinal) <= (i2^.ordinal)
+    i1 <= i2 = _ordinal i1 <= _ordinal i2
     {-# INLINE (<=) #-}
-    i1 >  i2 = (i1^.ordinal) >  (i2^.ordinal)
+    i1 >  i2 = _ordinal i1 >  _ordinal i2
     {-# INLINE (>) #-}
-    i1 >= i2 = (i1^.ordinal) >= (i2^.ordinal)
+    i1 >= i2 = _ordinal i1 >= _ordinal i2
     {-# INLINE (>=) #-}
 
 instance Num Color where
@@ -197,63 +196,84 @@ instance Real Color where
 
 uuid :: Lens' Client UUID
 uuid = lens _uuid (\c uu -> c { _uuid = uu })
+{-# INLINE uuid #-}
 
 connection :: Lens' Client WS.Connection
 connection = lens _connection (\c cn -> c { _connection = cn })
+{-# INLINE connection #-}
 
 username :: Lens' Client ByteString
 username = lens _username (\c un -> c { _username = un })
+{-# INLINE username #-}
 
 currGame :: Lens' Client ByteString
 currGame = lens _currGame (\c cg -> c { _currGame = cg })
+{-# INLINE currGame #-}
 
 timeStamp :: Lens' Input Double
 timeStamp = lens _timeStamp (\i ts -> i { _timeStamp = ts })
+{-# INLINE timeStamp #-}
 
 key :: Lens' Input Key
 key = lens _key (\i k -> i { _key = k })
+{-# INLINE key #-}
 
 isDown :: Lens' Input Bool
 isDown = lens _isDown (\i d -> i { _isDown = d })
+{-# INLINE isDown #-}
 
 ordinal :: Lens' InputGroup Word32
 ordinal = lens _ordinal (\ig o -> ig { _ordinal = o })
+{-# INLINE ordinal #-}
 
 now :: Lens' InputGroup Double
 now = lens _now (\ig n -> ig { _now = n })
+{-# INLINE now #-}
 
 dt :: Lens' InputGroup Double
 dt = lens _dt (\ig t -> ig { _dt = t })
+{-# INLINE dt #-}
 
 inputs :: Lens' InputGroup (Seq Input)
 inputs = lens _inputs (\ig is -> ig { _inputs = is })
+{-# INLINE inputs #-}
 
 pos :: Lens' PlayerState (V2 Double)
 pos = lens _pos (\ps p -> ps { _pos = p })
+{-# INLINE pos #-}
 
 vel :: Lens' PlayerState (V2 Double)
 vel = lens _vel (\ps v -> ps { _vel = v })
+{-# INLINE vel #-}
 
 color :: Lens' PlayerState Color
 color = lens _color (\ps c -> ps { _color = c })
+{-# INLINE color #-}
 
 inputQueue :: Lens' PlayerState (Seq InputGroup)
 inputQueue = lens _inputQueue (\ps iq -> ps { _inputQueue = iq })
+{-# INLINE inputQueue #-}
 
 lastOrdinal :: Lens' PlayerState Word32
 lastOrdinal = lens _lastOrdinal (\ps lo -> ps { _lastOrdinal = lo })
+{-# INLINE lastOrdinal #-}
 
 gameName :: Lens' Game ByteString
 gameName = lens _gameName (\g gn -> g { _gameName = gn })
+{-# INLINE gameName #-}
 
 players :: Lens' Game (Map Client PlayerState)
 players = lens _players (\g ps -> g { _players = ps })
+{-# INLINE players #-}
 
 gameState :: Lens' Game GameState
 gameState = lens _gameState (\g gs -> g { _gameState = gs })
+{-# INLINE gameState #-}
 
 physicsLoopId :: Lens' Game (Maybe ThreadId)
 physicsLoopId = lens _physicsLoopId (\g pi -> g { _physicsLoopId = pi })
+{-# INLINE physicsLoopId #-}
 
 broadcastLoopId :: Lens' Game (Maybe ThreadId)
 broadcastLoopId = lens _broadcastLoopId (\g bi -> g { _broadcastLoopId = bi })
+{-# INLINE broadcastLoopId #-}
