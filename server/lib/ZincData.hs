@@ -150,13 +150,13 @@ instance Enum Color where
     {-# INLINE toEnum #-}
 
 instance Ord Color where
-    c1 <  c2 = (fromEnum c1) <  (fromEnum c2)
+    c1 <  c2 = fromEnum c1 <  fromEnum c2
     {-# INLINE (<)  #-}
-    c1 <= c2 = (fromEnum c1) <= (fromEnum c2)
+    c1 <= c2 = fromEnum c1 <= fromEnum c2
     {-# INLINE (<=) #-}
-    c1 >  c2 = (fromEnum c1) >  (fromEnum c2)
+    c1 >  c2 = fromEnum c1 >  fromEnum c2
     {-# INLINE (>)  #-}
-    c1 >= c2 = (fromEnum c1) >= (fromEnum c2)
+    c1 >= c2 = fromEnum c1 >= fromEnum c2
     {-# INLINE (>=) #-}
 
 instance Integral Color where
@@ -164,15 +164,15 @@ instance Integral Color where
                                                    (quot g1 g2)
                                                    (quot b1 b2)
     {-# INLINE quot #-}
-    rem (Color r1 g1 b1) (Color r2 g2 b2)  = Color (rem  r1 r2)
+    rem  (Color r1 g1 b1) (Color r2 g2 b2) = Color (rem  r1 r2)
                                                    (rem  g1 g2)
                                                    (rem  b1 b2)
     {-# INLINE rem #-}
-    div (Color r1 g1 b1) (Color r2 g2 b2)  = Color (div  r1 r2)
+    div  (Color r1 g1 b1) (Color r2 g2 b2) = Color (div  r1 r2)
                                                    (div  g1 g2)
                                                    (div  b1 b2)
     {-# INLINE div #-}
-    mod (Color r1 g1 b1) (Color r2 g2 b2)  = Color (mod  r1 r2)
+    mod  (Color r1 g1 b1) (Color r2 g2 b2) = Color (mod  r1 r2)
                                                    (mod  g1 g2)
                                                    (mod  b1 b2)
     {-# INLINE mod #-}

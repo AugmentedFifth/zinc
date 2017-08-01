@@ -188,7 +188,7 @@ infixl 2 #=
           Game ->
           Game
 ( #= ) (# client, lens' #) newVal =
-    (& players %~ (Map.adjust (\ps -> ps & lens' .~ newVal) client))
+    (& players %~ Map.adjust (\ps -> ps & lens' .~ newVal) client)
 {-# INLINE ( #= ) #-}
 
 -- | Like '#=', but updates instead of sets to a given value.
@@ -198,7 +198,7 @@ infixl 2 <#>
          Game ->
          Game
 (<#>) (# client, lens' #) updater =
-    (& players %~ (Map.adjust (\ps -> ps & lens' %~ updater) client))
+    (& players %~ Map.adjust (\ps -> ps & lens' %~ updater) client)
 {-# INLINE (<#>) #-}
 
 -- | Infix version of the unboxed 2-tuple constructor, for use with the '#='
@@ -279,7 +279,7 @@ parseInput :: ByteString -> (# Maybe Input, ByteString #)
 parseInput s =
     case BG.runGetState getInput s 0 of
         Right ((timeStamp', key', isDown'), t) ->
-            (# Just $ Input
+            (# Just Input
                    { _timeStamp = timeStamp'
                    , _key       = getKey key'
                    , _isDown    = isDown' /= 0
@@ -312,7 +312,7 @@ parseInputGroup :: ByteString -> Maybe InputGroup
 parseInputGroup s =
     case maybeHeader of
         Just (ordinal', now', dt', t) ->
-            Just $ InputGroup
+            Just InputGroup
                 { _ordinal = ordinal'
                 , _now     = now'
                 , _dt      = dt'
@@ -415,7 +415,7 @@ processJoinGame joiner name clientReg gameReg = do
         case games !? name of
             Just game' ->
                 modifyTVar' game'
-                    (& players %~ (Map.insert joiner'' newPlayerState))
+                    (& players %~ Map.insert joiner'' newPlayerState)
             _ ->
                 pure ()
 
@@ -474,7 +474,7 @@ applyInputs ps =
                 in  V2 vx' vy' # V2 px' py'
         in  ps' & pos         .~ pos''
                 & vel         .~ v''''
-                & lastOrdinal %~ (max (inputGroup^.ordinal))
+                & lastOrdinal %~ max (inputGroup^.ordinal)
     ) ps (ps^.inputQueue) & inputQueue .~ Seq.empty
 
 physicsLoop :: TVar Game -> IO ()
