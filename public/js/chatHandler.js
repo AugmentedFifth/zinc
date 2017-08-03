@@ -74,19 +74,23 @@ ChatHandler.prototype.newFrame = function() {
 
 ChatHandler.prototype.splitMsg = function(msg) {
     "use strict";
-    const split = [];
+    const split = msg.split(" ");
+    const lines = [];
     let line = "";
     let i = 0;
-    while (i < msg.length) {
+    while (i < split.length) {
         if (line.length >= this.maxLineLen) {
-            split.push(line);
+            lines.push(line);
             line = "";
         }
-        line += msg[i];
+        if (line.length > 0) {
+            line += " ";
+        }
+        line += split[i];
         i++;
     }
     if (line) {
-        split.push(line);
+        lines.push(line);
     }
-    return split;
+    return lines;
 };

@@ -1,6 +1,8 @@
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE MultiWayIf        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Strict            #-}
+{-# LANGUAGE UnboxedSums       #-}
 {-# LANGUAGE UnboxedTuples     #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
@@ -74,12 +76,12 @@ import           Control.Monad                 (forever, unless, void)
 
 import           Data.ByteString               (ByteString)
 import qualified Data.ByteString               as B
-import           Data.Foldable                 (foldl')
+import           Data.Foldable                 (foldl', for_)
 import           Data.Function                 ((&))
 import           Data.Map.Strict               ((!?))
 import qualified Data.Map.Strict               as Map
-import           Data.Maybe                    (fromJust)
-import           Data.Sequence                 (Seq, (<|), (|>))
+import           Data.Maybe                    (fromJust, isNothing)
+import           Data.Sequence                 (Seq, (<|), (><), (|>))
 import qualified Data.Sequence                 as Seq
 import qualified Data.Serialize.Get            as BG
 import           Data.Serialize.IEEE754        (getFloat64le, putFloat64le)
@@ -143,6 +145,14 @@ mainWidth = 1280
 -- | Height of playing field.
 mainHeight :: Double
 mainHeight = 720
+
+-- | Maximum time a player can charge a shot.
+maxHoldTime :: Double
+maxHoldTime = 2000
+
+-- | Maximum velocity of a fired projectile.
+maxProjVel :: Double
+maxProjVel = 2.5
 
 -- * Utility functions
 
@@ -286,7 +296,7 @@ parseInput s =
                    }
             ,  t
             #)
-        _ -> (# Nothing, s #)
+        _ -> Nothing # s
   where
     getInput = do
         timeStamp' <- getFloat64le
@@ -302,34 +312,77 @@ parseInput s =
             3 -> V2 1    0
             _ -> V2 0    0
 
-parseInputs :: ByteString -> Seq Input
-parseInputs s =
-    case parseInput s of
-        (# Just input, t #) -> input <| parseInputs t
+parseInputs :: Word8 -> ByteString -> (# Seq Input, ByteString #)
+parseInputs count s =
+    if count > 0 then
+        case parseInput s of
+            (# Just input, t #) ->
+                let (# inputs', t' #) = parseInputs (count - 1) t
+                in  input <| inputs' # t'
+            (# _, t #) ->
+                Seq.empty # t
+    else
+        Seq.empty # s
+
+parseClick :: ByteString -> (# Maybe Click, ByteString #)
+parseClick s =
+    case BG.runGetState getClick s 0 of
+        Right (click, t) -> Just click # t
+        _                -> Nothing    # s
+  where
+    getClick = do
+        isDown    <- BG.getWord8
+        timestamp <- getFloat64le
+        if isDown == 0 then do
+            clickId <- BG.getWord32le
+            pure $ Click timestamp (# clickId | #)
+        else do
+            clickX <- getFloat64le
+            clickY <- getFloat64le
+            pure $ Click timestamp (# | V2 clickX clickY #)
+
+parseClicks :: ByteString -> Seq Click
+parseClicks s =
+    case parseClick s of
+        (# Just click, t #) -> click <| parseClicks t
         _                   -> Seq.empty
+{-# INLINE parseClicks #-}
 
 parseInputGroup :: ByteString -> Maybe InputGroup
 parseInputGroup s =
     case maybeHeader of
-        Just (ordinal', now', dt', t) ->
-            Just InputGroup
-                { _ordinal = ordinal'
-                , _now     = now'
-                , _dt      = dt'
-                , _inputs  = parseInputs t
-                }
+        Just (ordinal', now', dt', keypressCount, t) ->
+            let (# inputs', t' #) = parseInputs keypressCount t in
+                Just InputGroup
+                    { _ordinal = ordinal'
+                    , _now     = now'
+                    , _dt      = dt'
+                    , _inputs  = inputs'
+                    , _clicks  = parseClicks t'
+                    }
         _ -> Nothing
   where
     maybeHeader = case BG.runGetState getInputHeader s 0 of
-        Right ((ordinal', now', dt'), t) ->
-            Just (ordinal', now', dt', t)
+        Right ((ordinal', now', dt', keypressCount), t) ->
+            Just (ordinal', now', dt', keypressCount, t)
         _ ->
             Nothing
     getInputHeader = do
-        ordinal' <- BG.getWord32le
-        now'     <- getFloat64le
-        dt'      <- getFloat64le
-        pure (ordinal', now', dt')
+        ordinal'      <- BG.getWord32le
+        now'          <- getFloat64le
+        dt'           <- getFloat64le
+        keypressCount <- BG.getWord8
+        pure (ordinal', now', dt', keypressCount)
+
+serializeProjectiles :: Seq Projectile -> ByteString
+serializeProjectiles pjs =
+    BP.runPut $ for_ pjs $ \(Projectile id' (V2 px py) (V2 vx vy) phase) -> do
+        BP.putWord32le id'
+        putFloat64le px
+        putFloat64le py
+        putFloat64le vx
+        putFloat64le vy
+        BP.putWord8 phase
 
 serializeGameState :: Game -> ByteString
 serializeGameState game =
@@ -340,6 +393,8 @@ serializeGameState game =
             V2 vx vy = ps^.vel
             Color r g b = ps^.color
             username' = client^.username
+            projectiles' = ps^.projectiles
+            serialProjectiles = serializeProjectiles projectiles'
         in  mappend accu $ BP.runPut $
             do
                 BP.putWord8 $ fromIntegral $ B.length username'
@@ -351,6 +406,8 @@ serializeGameState game =
                 BP.putWord8 r
                 BP.putWord8 g
                 BP.putWord8 b
+                BP.putWord8 $ fromIntegral $ Seq.length projectiles'
+                BP.putByteString serialProjectiles
                 BP.putWord32le $ ps^.lastOrdinal
 
 -- * Primary functions
@@ -419,13 +476,66 @@ processJoinGame joiner name clientReg gameReg = do
             _ ->
                 pure ()
 
+updateProjectile :: Double -> Projectile -> Projectile
+updateProjectile dt' (Projectile p (V2 vx vy) 0) =
+    -- Adjust position based on velocity.
+    let V2 px py = p + v ^* dt'
+        -- Collision detection.
+        (# vy', py', hitY #) = if
+            | py <= 0          -> (# -vy, 0,          True  #)
+            | py >= mainHeight -> (# -vy, mainHeight, True  #)
+            | otherwise        -> (#  vy, py,         False #)
+        (# vx', px', hitX #) = if
+            | px >= mainWidth  -> (# -vx, mainWidth,  True  #)
+            | px <= 0          -> (# -vx, 0,          True  #)
+            | otherwise        -> (#  vx, px,         False #)
+    in  Projectile (V2 px' py') (V2 vx' vy') (hitY || hitX ? 1 $ 0)
+updateProjectile _ pj = pj
+
 -- | what
 applyInputs :: PlayerState -> PlayerState
 applyInputs ps =
     foldl' (\ps' inputGroup ->
-        -- Calculate accelerations for this frame based on input log.
-        let (v', pressed', _, t_') = foldl' (\(v, pressed, t0', t_) inp ->
-                let t1 = inp^.timeStamp
+        -- Spawn new projectiles, adjusting player velocity as necessary.
+        let (_, _, projectiles', v') =
+                foldl' (\(lastPress', cid', pjs, v)
+                         (Click timestamp clickPos) ->
+                    let maybePjAndNewVel = do
+                        V2 px py  <- clickPos
+                        lastPress <- lastPress'
+                        cid       <- cid'
+                        let mouseDt = timestamp - lastPress
+                        let pPos = ps'^.pos
+                        let playerCenter = pPos + pure (side / 2)
+                        let dir = normalize $ clickPos - playerCenter
+                        if nullV dir then
+                            Nothing
+                        else
+                            let ratio =
+                                    min mouseDt maxHoldTime / maxHoldTime
+                                startPos =
+                                    playerCenter + side * 0.75 *^ dir
+                                projVel = maxProjVel * ratio *^ dir
+                                v1 = v + dir ^* (-ratio)
+                            in  pure (Projectile cid startPos projVel 0, v1)
+                    in  ( case clickPos of
+                              (# _ |   #) -> Just timestamp
+                              (#   | _ #) -> Nothing
+                        , case clickPos of
+                              (# cid |   #) -> Just cid
+                              (#     | _ #) -> Nothing
+                        , case maybePjAndNewVel of
+                              Just (pj, _) -> pjs |> pj
+                              _            -> pjs
+                        , case maybePjAndNewVel of
+                              Just (_, newVel) -> newVel
+                              _                -> v
+                        )
+                ) (Nothing, Nothing, ps'^.projectiles, ps'^.vel)
+                  (inputGroup^.clicks)
+            -- Calculate accelerations for this frame based on input log.
+            (v'', pressed', _, t_') = foldl' (\(v, pressed, t0', t_) inp ->
+                let t1   = inp^.timeStamp
                     down = inp^.isDown
                 in  ( case t0' of
                           Just t0 -> let thisDt = t1 - t0 in
@@ -443,25 +553,25 @@ applyInputs ps =
                       else
                           t_
                     )
-                ) (ps'^.vel, Set.empty, Nothing, Nothing)
+                ) (v', Set.empty, Nothing, Nothing)
                   (inputGroup^.inputs)
             leftoverDir = (normalize . sum) pressed'
-            v'' = if nullV leftoverDir then
-                     v'
-                 else let thisDt = (inputGroup^.now) - fromJust t_' in
-                     v' + leftoverDir ^* (appForce / mass * thisDt)
+            v''' = if nullV leftoverDir then
+                       v''
+                   else let thisDt = (inputGroup^.now) - fromJust t_' in
+                       v'' + leftoverDir ^* (appForce / mass * thisDt)
             -- Apply frictional forces.
             dt' = inputGroup^.dt
-            v''' = let frictionalDvNorm = -friction * dt'
-                  in if nullV v'' || abs frictionalDvNorm >= norm v'' then
-                      zero
-                  else
-                      v'' + normalize v'' ^* frictionalDvNorm
+            v'''' = let frictionalDvNorm = -friction * dt'
+                    in if nullV v''' || abs frictionalDvNorm >= norm v''' then
+                        zero
+                    else
+                        v''' + normalize v''' ^* frictionalDvNorm
             -- Update position based on new velocity.
-            pos' = (ps'^.pos) + v''' ^* dt'
+            pos' = (ps'^.pos) + v'''' ^* dt'
             -- Collision detection.
-            (# v'''', pos'' #) =
-                let V2 vx vy = v'''
+            (# v''''', pos'' #) =
+                let V2 vx vy = v''''
                     V2 px py = pos'
                     (# vy', py' #) = if
                         | py <= 0                 -> -vy # 0
@@ -472,8 +582,14 @@ applyInputs ps =
                         | px <= 0                 -> -vx # 0
                         | otherwise               ->  vx # px
                 in  V2 vx' vy' # V2 px' py'
+            -- Update projectile positions.
+            notDestroyed (Projectile _ _ _ phase) = phase < 2
+            projectiles'' =
+                (fmap (updateProjectile dt') . Seq.filter notDestroyed)
+                    projectiles'
         in  ps' & pos         .~ pos''
-                & vel         .~ v''''
+                & vel         .~ v'''''
+                & projectiles .~ projectiles''
                 & lastOrdinal %~ max (inputGroup^.ordinal)
     ) ps (ps^.inputQueue) & inputQueue .~ Seq.empty
 
@@ -483,10 +599,20 @@ physicsLoop game' = forever $ do
     atomically $ modifyTVar' game' (& players %~ Map.map applyInputs)
 {-# INLINE physicsLoop #-}
 
+setProjsBroadcast :: Game -> Game
+setProjsBroadcast =
+    (& players %~ fmap
+        (& projectiles %~ fmap (\case
+            Projectile p v 1 -> Projectile p v 2
+            pj               -> pj)))
+{-# INLINE setProjsBroadcast #-}
+
 broadcastLoop :: TVar Game -> IO ()
 broadcastLoop game' = forever $ do
     threadDelay 45000
-    game <- readTVarIO game'
+    game <- atomically $ do
+        modifyTVar' game' setProjsBroadcast
+        readTVar game'
     let s = serializeGameState game
     let sendPacket client _ = WS.sendBinaryData (client^.connection) s
     Map.traverseWithKey sendPacket (game^.players)

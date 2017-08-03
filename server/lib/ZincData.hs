@@ -1,4 +1,5 @@
-{-# LANGUAGE Strict #-}
+{-# LANGUAGE Strict      #-}
+{-# LANGUAGE UnboxedSums #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -48,6 +49,9 @@ data Client = Client
 
 type Key = V2 Double
 
+data Click = Click Double (# Double | V2 Double #)
+    deriving (Eq, Ord, Show)
+
 data Input = Input
     { _timeStamp :: Double
     , _key       :: Key
@@ -59,9 +63,20 @@ data InputGroup = InputGroup
     , _now     :: Double
     , _dt      :: Double
     , _inputs  :: Seq Input
+    , _clicks  :: Seq Click
     } deriving (Eq, Show)
 
 data Color = Color Word8 Word8 Word8
+    deriving (Eq, Show)
+
+data Projectile = Projectile
+                  Word32      -- ^ ID
+                  (V2 Double) -- ^ Position
+                  (V2 Double) -- ^ Velocity
+                  Word8       -- ^ Phase:
+                              --   0 = normal flight,
+                              --   1 = Broken but not broadcast,
+                              --   2 = Broken and broadcast
     deriving (Eq, Show)
 
 data PlayerState = PlayerState
@@ -69,6 +84,7 @@ data PlayerState = PlayerState
     , _vel         :: V2 Double
     , _color       :: Color
     , _inputQueue  :: Seq InputGroup
+    , _projectiles :: Seq Projectile
     , _lastOrdinal :: Word32
     } deriving (Show)
 
@@ -238,6 +254,10 @@ inputs :: Lens' InputGroup (Seq Input)
 inputs = lens _inputs (\ig is -> ig { _inputs = is })
 {-# INLINE inputs #-}
 
+clicks :: Lens' InputGroup (Seq Click)
+clicks = lens _clicks (\ig cs -> ig { _clicks = cs })
+{-# INLINE clicks #-}
+
 pos :: Lens' PlayerState (V2 Double)
 pos = lens _pos (\ps p -> ps { _pos = p })
 {-# INLINE pos #-}
@@ -253,6 +273,10 @@ color = lens _color (\ps c -> ps { _color = c })
 inputQueue :: Lens' PlayerState (Seq InputGroup)
 inputQueue = lens _inputQueue (\ps iq -> ps { _inputQueue = iq })
 {-# INLINE inputQueue #-}
+
+projectiles :: Lens' PlayerState (Seq Projectile)
+projectiles = lens _projectiles (\ps pj -> ps { _projectiles = pj })
+{-# INLINE projectiles #-}
 
 lastOrdinal :: Lens' PlayerState Word32
 lastOrdinal = lens _lastOrdinal (\ps lo -> ps { _lastOrdinal = lo })

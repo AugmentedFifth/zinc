@@ -45,8 +45,8 @@ Map.prototype.clearKeysUpTo = function(n) {
  *
  * Predicate takes up to 3 params:
  *
- * 1. The key.
- * 2. The value.
+ * 1. The value.
+ * 2. The key.
  * 3. `this`, the `Map` object being filtered through.
  *
  * Returns `this`, **not** a new `Map`.
@@ -59,10 +59,15 @@ Map.prototype.clearKeysUpTo = function(n) {
 Map.prototype.filter = function(f) {
     "use strict";
     this.forEach((v, k, this_) => {
-        if (!f(k, v, this_)) {
+        if (!f(v, k, this_)) {
             this.delete(k);
         }
     });
+};
+
+Map.prototype.adjust = function(k, f) {
+    "use strict";
+    this.set(k, f(this.get(k), k, this));
 };
 
 
@@ -910,7 +915,7 @@ V2.prototype.perp = function() {
 };
 
 /**
- * Returns a unit-norm `V2` that is `theta` away from the positive x-axis,
+ * Returns a unit vector `V2` that is `theta` away from the positive x-axis,
  * anticlockwise.
  *
  * `theta` is in radians.

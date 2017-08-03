@@ -69,5 +69,17 @@ Player.prototype.pushVel = function(newVel) {
  */
 Player.prototype.lerp = function(ratio) {
     "use strict";
-    this.lerpPos = this.pos.scalarMult(ratio).add(this.lastPos.scalarMult(1 - ratio));
+    this.lerpPos = this.pos.scalarMult(ratio).add(
+        this.lastPos.scalarMult(1 - ratio)
+    );
+};
+
+/**
+ * Returns a `V2` representing the position of the center of this player.
+ *
+ * @return {V2}
+ */
+Player.prototype.center = function() {
+    "use strict";
+    return this.pos.add(v2(this.side / 2, this.side / 2));
 };

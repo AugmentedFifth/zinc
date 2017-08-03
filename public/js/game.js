@@ -38,20 +38,19 @@ Main.game = (canvas, ctx, ws) => {
         48,
         color
     );
-    /*
-    const playerShadow = new Player(
-        v2(50, 50),
-        12,
-        3e-2,
-        1e-3,
-        48,
-        color
-    );
-    */
 
     let keypressLog = [];
+    let mouseLog = [];
     let movementSendCounter = 0;
+    let mouseIdCounter = 0;
     const waitingForConfirmation = new Map();
+
+    let projectiles = new Map();
+    let lastMouseDown;
+    const maxHoldTime = 2000; // milliseconds
+    const minHoldTime = 200;
+    Main.maxProjVel = 2.5;
+    Main.maxProjAngVel = 0.02;
 
     // Sending initial game-start "hello".
     const hereIsMyGameInfoBytes = [0x02];
@@ -182,11 +181,95 @@ Main.game = (canvas, ctx, ws) => {
     window.addEventListener("keyup", _keyup);
     eventListeners.register(window, "keyup", _keyup);
 
+    const _mousedown = e => {
+        const now = window.performance.now();
+        if (e.button !== 0) {
+            return;
+        }
+        lastMouseDown = now;
+        mouseLog.push([now, mouseIdCounter]);
+        mouseIdCounter++;
+    };
+    canvas.addEventListener("mousedown", _mousedown);
+    eventListeners.register(canvas, "mousedown", _mousedown);
+
+    const _mouseup = e => {
+        const now = window.performance.now();
+        if (e.button !== 0) {
+            return;
+        }
+        const mouseDt = now - lastMouseDown;
+        lastMouseDown = undefined;
+        if (mouseDt < minHoldTime) {
+            return;
+        }
+
+        const boundingRect = canvas.getBoundingClientRect();
+        const clickPos = v2(
+            e.clientX - boundingRect.left,
+            e.clientY - boundingRect.top
+        );
+
+        mouseLog.push([now, clickPos]);
+    };
+    canvas.addEventListener("mouseup", _mouseup);
+    eventListeners.register(canvas, "mouseup", _mouseup);
+
     // Info on other players.
     const otherPlayers = new Map();
+    const otherProjectiles = new Map();
+    const otherProjectilesBroken = new Map();
     let recvCount = 0;
-    let lastRecv, recvDtAvg;
-    let lastRecvDt;
+    let lastRecv, recvDtAvg, lastRecvDt;
+
+    // Extra drawing function for projectiles.
+    const drawProjectile = thePlayer => p => {
+        ctx.save();
+
+        ctx.strokeStyle = "#111";
+        ctx.fillStyle = thePlayer.color;
+
+        if (p.isBroken) {
+            // Draw projectile dust.
+            p.dust.forEach(([pos]) => {
+                ctx.beginPath();
+                ctx.moveTo(
+                    pos.x + p.dustRadius,
+                    pos.y
+                );
+                for (let i = 1; i <= 6; ++i) { // Hexagonal
+                    const theta = 2 * Math.PI * i / 6;
+                    ctx.lineTo(
+                        pos.x + Math.cos(theta) * p.dustRadius,
+                        pos.y + Math.sin(theta) * p.dustRadius
+                    );
+                }
+                ctx.closePath();
+
+                ctx.stroke();
+                ctx.fill();
+            });
+        } else {
+            ctx.beginPath();
+            ctx.moveTo(
+                p.pos.x + Math.cos(p.angPos) * p.radius,
+                p.pos.y + Math.sin(p.angPos) * p.radius
+            );
+            for (let i = 1; i <= 6; ++i) { // Hexagonal
+                const theta = p.angPos + 2 * Math.PI * i / 6;
+                ctx.lineTo(
+                    p.pos.x + Math.cos(theta) * p.radius,
+                    p.pos.y + Math.sin(theta) * p.radius
+                );
+            }
+            ctx.closePath();
+
+            ctx.stroke();
+            ctx.fill();
+        }
+
+        ctx.restore();
+    };
 
     // Server interaction.
     Main.wsRecvCallback = data => {
@@ -248,7 +331,7 @@ Main.game = (canvas, ctx, ws) => {
                 const nameLen = view.getUint8(offset);
                 offset++;
                 let name = "";
-                for (let j = 0; j < nameLen; ++j) {
+                for (let i = 0; i < nameLen; ++i) {
                     name += String.fromCharCode(view.getUint8(offset));
                     offset++;
                 }
@@ -267,6 +350,32 @@ Main.game = (canvas, ctx, ws) => {
                 offset++;
                 const blue = view.getUint8(offset).toString(16);
                 offset++;
+                const projCount = view.getUint8(offset);
+                offset++;
+                const projs = new Map();
+                for (let i = 0; i < projCount; ++i) {
+                    const id = view.getUint32(offset, true);
+                    offset += 4;
+                    const ppx = view.getFloat64(offset, true);
+                    offset += 8;
+                    const ppy = view.getFloat64(offset, true);
+                    offset += 8;
+                    const pvx = view.getFloat64(offset, true);
+                    offset += 8;
+                    const pvy = view.getFloat64(offset, true);
+                    offset += 8;
+                    const phase = view.getUint8(offset);
+                    offset++;
+                    projs.set(
+                        id,
+                        projectile(
+                            id,
+                            v2(ppx, ppy),
+                            v2(pvx, pvy),
+                            phase
+                        )
+                    );
+                }
                 const lastOrdinal = view.getUint32(offset, true);
                 offset += 4;
                 if (isOtherPlayer) {
@@ -287,15 +396,41 @@ Main.game = (canvas, ctx, ws) => {
                         otherPlayer.vel = v2(vx, vy);
                         otherPlayers.set(name, otherPlayer);
                     }
+
+                    const thisPlayersProjs =
+                        otherProjectiles.has(name) ?
+                            otherProjectiles.get(name) :
+                            new Map();
+                    /* jshint loopfunc: true */
+                    projs.forEach((pj, id) => {
+                        //if (thisPlayersProjs.has(pj.id)) {
+
+                        //} else {
+                            thisPlayersProjs.set(id, pj);
+                        //}
+                    });
+                    /* jshint loopfunc: false */
+                    otherProjectiles.set(name, thisPlayersProjs);
+
                     playersSeen.add(name);
                 } else {
-                    //playerShadow.pushPos(v2(px, py));
-                    //playerShadow.pushVel(v2(vx, vy));
-                    //playerShadow.color = `#${red}${green}${blue}`;
                     const toConfirm = waitingForConfirmation.get(lastOrdinal);
                     if (toConfirm !== undefined) {
-                        const diff = v2(px, py).sub(toConfirm);
+                        const [pos, pjClones] = toConfirm;
+                        const diff = v2(px, py).sub(pos);
                         player.addPos(diff);
+
+                        /* jshint loopfunc: true */
+                        pjClones.forEach((pjPos, id) => {
+                            const relevantProj = projs.get(id);
+                            if (relevantProj !== undefined) {
+                                const posDiff = relevantProj.pos.sub(pjPos);
+                                if (!posDiff.null() && projectiles.has(id)) {
+                                    projectiles.get(id).addPos(posDiff);
+                                }
+                            }
+                        });
+                        /* jshint loopfunc: false */
                     }
                     waitingForConfirmation.clearKeysUpTo(lastOrdinal);
                 }
@@ -402,9 +537,61 @@ Main.game = (canvas, ctx, ws) => {
             false
         );
 
-        // TODO: Draw info/status.
-
         /* Update local player position/physics. */
+        // Spawn new projectiles.
+        const mouseLogCopy = mouseLog;
+        mouseLog = [];
+        let lastPress, lastClickId;
+        mouseLogCopy.forEach(([timestamp, clickPos]) => {
+            if (typeof clickPos === "number") {
+                lastPress = timestamp;
+                lastClickId = clickPos;
+                return;
+            }
+
+            const lastPressCopy = lastPress;
+            lastPress = undefined;
+            const lastClickIdCopy = lastClickId;
+            lastClickId = undefined;
+
+            if (lastPressCopy === undefined || lastClickIdCopy === undefined) {
+                return;
+            }
+
+            const mouseDt = timestamp - lastPressCopy;
+
+            const dir = clickPos.sub(player.center()).normalize();
+            if (dir.null()) {
+                return;
+            }
+            const ratio = Math.min(mouseDt, maxHoldTime) / maxHoldTime;
+
+            const startPos = player.center().add(
+                dir.scalarMult(player.side * 0.75)
+            );
+            const projVel = dir.scalarMult(Main.maxProjVel * ratio);
+
+            const startAngPos = Math.random() * 2 * Math.PI;
+            const projAngVel = Main.maxProjAngVel * ratio;
+
+            projectiles.set(
+                lastClickIdCopy,
+                new Projectile(
+                    lastClickIdCopy,
+                    startPos,
+                    projVel,
+                    startAngPos,
+                    projAngVel,
+                    12
+                )
+            );
+
+            player.addVel(dir.scalarMult(-ratio));
+        });
+        if (lastPress !== undefined) {
+            mouseLog.unshift([lastPress, null]);
+        }
+
         // Get a copy of the keypress log to work with and then start a new
         // stack. We cut off any keys that are still down at this point, and
         // copy them over to the new stack.
@@ -488,18 +675,60 @@ Main.game = (canvas, ctx, ws) => {
             player.pos.x = 0;
         }
 
+        // Update projectile positions.
+        projectiles.forEach(p => {
+            p.update(dt);
+
+            // Collision detection.
+            if (p.pos.y <= 0) { // Hit top
+                p.isBroken = true;
+                p.pos.y = 0;
+                p.vel.y = -p.vel.y;
+            } else if (p.pos.y >= Main.height) { // Hit bottom
+                p.isBroken = true;
+                p.pos.y = Main.height;
+                p.vel.y = -p.vel.y;
+            }
+            if (p.pos.x >= Main.width) { // Hit right
+                p.isBroken = true;
+                p.pos.x = Main.width;
+                p.vel.x = -p.vel.x;
+            } else if (p.pos.x <= 0) { // Hit left
+                p.isBroken = true;
+                p.pos.x = 0;
+                p.vel.x = -p.vel.x;
+            }
+        });
+        projectiles.filter(p => !p.isDestroyed);
+        // Also filter out destoyed foreign projectiles.
+        otherProjectiles.filter((pj, name) => otherPlayers.has(name));
+        otherProjectiles.forEach(pjs => pjs.filter((id, p) => !p.isDestroyed));
+
         // Saving calculated position to be confirmed by server later.
-        waitingForConfirmation.set(movementSendCounter, player.pos.clone());
+        const projectilesClone = new Map();
+        projectiles.forEach(({pos}, id) =>
+            projectilesClone.set(id, pos)
+        );
+        waitingForConfirmation.set(
+            movementSendCounter,
+            [ player.pos.clone()
+            , projectilesClone
+            ]
+        );
 
         // Send inputs to server.
+        if (keypressLogCopy.length > 0xFF) {
+            // This `if` branch should never execute, buT WHO KNOWS???/
+            keypressLogCopy.splice(0, keypressLogCopy.length - 0xFF);
+        }
         const hereAreMyMovementsBytes = [0x03];
         const pushByte = b => hereAreMyMovementsBytes.push(b);
         Main.data.i32ToBytes(movementSendCounter).forEach(pushByte);
         movementSendCounter++;
         Main.data.f64ToBytes(now).forEach(pushByte);
         Main.data.f64ToBytes(dt).forEach(pushByte);
-        for (let i = 0; i < keypressLogCopy.length; ++i) {
-            const [t, key, down] = keypressLogCopy[i];
+        pushByte(keypressLogCopy.length);
+        keypressLogCopy.forEach(([t, key, down]) => {
             Main.data.f64ToBytes(t).forEach(pushByte);
             pushByte(controllerKeyIndices.get(key));
             if (down) {
@@ -507,7 +736,19 @@ Main.game = (canvas, ctx, ws) => {
             } else {
                 pushByte(0x00);
             }
-        }
+        });
+        //pushByte(mouseLogCopy.length);
+        mouseLogCopy.forEach(([timestamp, clickPos]) => {
+            const isDown = typeof clickPos === "number";
+            pushByte(isDown ? 0 : 1);
+            Main.data.f64ToBytes(timestamp).forEach(pushByte);
+            if (isDown) {
+                Main.data.i32ToBytes(clickPos).forEach(pushByte);
+            } else {
+                Main.data.f64ToBytes(clickPos.x).forEach(pushByte);
+                Main.data.f64ToBytes(clickPos.y).forEach(pushByte);
+            }
+        });
         ws.send(new Uint8Array(hereAreMyMovementsBytes).buffer);
 
         // Draw player.
@@ -526,31 +767,26 @@ Main.game = (canvas, ctx, ws) => {
             player.pos.y + player.side + usernameFontSize
         );
 
-        ctx.restore();
+        // Draw display for projectile charge level.
+        if (lastMouseDown !== undefined) {
+            const chargeRatio = Math.min(
+                window.performance.now() - lastMouseDown,
+                maxHoldTime
+            ) / maxHoldTime;
 
-        // Drawing player shadow based on server side data for testing.
-        /*
-        ctx.save();
-
-        if (recvDtAvg !== undefined && lastRecv !== undefined) {
-            const recvDt = window.performance.now() - lastRecv;
-            playerShadow.lerp(Math.min(Math.max(recvDt / recvDtAvg, 0), 1));
+            ctx.fillStyle = textBgPattern;
+            ctx.globalCompositeOperation = "overlay";
+            ctx.fillRect(
+                player.pos.x,
+                player.pos.y + player.side * (1 - chargeRatio),
+                player.side,
+                player.side * chargeRatio
+            );
         }
 
-        ctx.fillStyle = playerShadow.color;
-        ctx.globalCompositeOperation = "screen";
-        ctx.fillRect(
-            playerShadow.lerpPos.x,
-            playerShadow.lerpPos.y,
-            playerShadow.side,
-            playerShadow.side
-        );
-
         ctx.restore();
-        */
 
         // Draw other players.
-        //console.log(otherPlayers);
         otherPlayers.forEach((p, name) => {
             ctx.save();
 
@@ -579,6 +815,33 @@ Main.game = (canvas, ctx, ws) => {
             );
 
             ctx.restore();
+        });
+
+        // Draw projectiles.
+        projectiles.forEach(drawProjectile(player));
+
+        // Update categorization of foreign projectiles.
+        otherProjectilesBroken.forEach((brokenPjs, playerName) =>
+            otherProjectilesBroken.set(
+                playerName,
+                brokenPjs.filter(p => !p.isDestroyed)
+            )
+        );
+
+        // Draw foreign projectiles.
+        otherProjectiles.forEach((pjs, playerName) => {
+            const thePlayer = otherPlayers.get(playerName);
+
+            const now_ = window.performance.now();
+            if (thePlayer !== undefined) {
+                pjs.forEach(pj => {
+                    if (recvDtAvg !== undefined && lastRecv !== undefined) {
+                        const recvDt = now_ - lastRecv;
+                        pj.lerp(Math.min(Math.max(recvDt / recvDtAvg, 0), 1));
+                    }
+                    drawProjectile(thePlayer)(pj);
+                });
+            }
         });
 
         // Chat bubbles.
