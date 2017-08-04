@@ -15,6 +15,7 @@ function ChatHandler(eventListeners,
 
     const _chatKeydown = e => {
         if (this.active) {
+            e.preventDefault();
             if (e.key === "Enter") {
                 if (this.text) {
                     const sendChatBytes = [0x06];
@@ -66,9 +67,7 @@ ChatHandler.prototype.addChatBubble = function(playerName, msg) {
 ChatHandler.prototype.newFrame = function() {
     "use strict";
     const now = window.performance.now();
-    this.chatBubbles.filter(
-        (playerName, [t]) => t + this.chatDisplayPeriod >= now
-    );
+    this.chatBubbles.filter(([t]) => t + this.chatDisplayPeriod >= now);
     return this.chatBubbles;
 };
 

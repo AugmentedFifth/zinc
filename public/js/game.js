@@ -404,8 +404,10 @@ Main.game = (canvas, ctx, ws) => {
                     /* jshint loopfunc: true */
                     projs.forEach((pj, id) => {
                         if (thisPlayersProjs.has(id)) {
-                            thisPlayersProjs.get(id).pushPos(pj.pos);
-                            thisPlayersProjs.get(id).isBroken = pj.isBroken;
+                            const relevantProj = thisPlayersProjs.get(id);
+                            relevantProj.pos = pj.pos;
+                            relevantProj.vel = pj.vel;
+                            relevantProj.isBroken = pj.isBroken;
                         } else {
                             thisPlayersProjs.set(id, pj);
                         }
@@ -702,8 +704,11 @@ Main.game = (canvas, ctx, ws) => {
         });
         projectiles.filter(p => !p.isDestroyed);
         // Also filter out destoyed foreign projectiles.
-        otherProjectiles.filter((pj, name) => otherPlayers.has(name));
-        otherProjectiles.forEach(pjs => pjs.filter((id, p) => !p.isDestroyed));
+        otherProjectiles.filter((pjs, name) => otherPlayers.has(name));
+        otherProjectiles.forEach(pjs => {
+            pjs.forEach(pj => pj.update(dt));
+            pjs.filter((id, p) => !p.isDestroyed);
+        });
 
         // Saving calculated position to be confirmed by server later.
         const projectilesClone = new Map();
@@ -824,16 +829,8 @@ Main.game = (canvas, ctx, ws) => {
         // Draw foreign projectiles.
         otherProjectiles.forEach((pjs, playerName) => {
             const thePlayer = otherPlayers.get(playerName);
-
-            const now_ = window.performance.now();
             if (thePlayer !== undefined) {
-                pjs.forEach(pj => {
-                    if (recvDtAvg !== undefined && lastRecv !== undefined) {
-                        const recvDt = now_ - lastRecv;
-                        pj.lerp(Math.min(Math.max(recvDt / recvDtAvg, 0), 1));
-                    }
-                    drawProjectile(thePlayer)(pj);
-                });
+                pjs.forEach(drawProjectile(thePlayer));
             }
         });
 
@@ -852,19 +849,20 @@ Main.game = (canvas, ctx, ws) => {
                         player.pos.x + player.side / 2,
                         player.pos.y - 6
                     );
-                } else {
-                    const otherPlayer = otherPlayers.get(playerName);
-                    if (otherPlayer === undefined) {
-                        console.log(
-                            `Chat from absent player "${playerName}": ${msg}`
-                        );
-                        return;
-                    }
-                    return v2(
-                        otherPlayer.lerpPos.x + otherPlayer.side / 2,
-                        otherPlayer.lerpPos.y - 6
-                    );
                 }
+                const otherPlayer = otherPlayers.get(playerName);
+                if (otherPlayer === undefined) {
+                    /*
+                    console.log(
+                        `Chat from absent player "${playerName}": ${msg}`
+                    );
+                    */
+                    return;
+                }
+                return v2(
+                    otherPlayer.lerpPos.x + otherPlayer.side / 2,
+                    otherPlayer.lerpPos.y - 6
+                );
             })();
 
             if (textPos === undefined) {
@@ -872,13 +870,11 @@ Main.game = (canvas, ctx, ws) => {
             }
 
             const split = chatHandler.splitMsg(msg);
-            split.forEach((line, i) => {
-                ctx.fillText(
-                    line,
-                    textPos.x,
-                    textPos.y - (split.length - 1 - i) * 21
-                );
-            });
+            split.forEach((line, i) => ctx.fillText(
+                line,
+                textPos.x,
+                textPos.y - (split.length - 1 - i) * 21
+            ));
         });
 
         ctx.restore();

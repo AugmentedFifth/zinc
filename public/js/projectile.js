@@ -2,8 +2,6 @@ function Projectile(id, pos, vel, angPos, angVel, radius) {
     "use strict";
     this.id = id;
     this.pos = pos;
-    this.lastPos = pos;
-    this.lerpPos = pos;
     this.vel = vel;
     this.angPos = angPos;
     this.angVel = angVel;
@@ -75,19 +73,6 @@ Projectile.prototype.update = function(dt) {
 Projectile.prototype.addPos = function(d) {
     "use strict";
     this.pos = this.pos.add(d);
-};
-
-Projectile.prototype.pushPos = function(newPos) {
-    "use strict";
-    this.lastPos = this.lerpPos;
-    this.pos = newPos;
-};
-
-Projectile.prototype.lerp = function(ratio) {
-    "use strict";
-    this.lerpPos = this.pos.scalarMult(ratio).add(
-        this.lastPos.scalarMult(1 - ratio)
-    );
 };
 
 Projectile.prototype.clone = function() {
