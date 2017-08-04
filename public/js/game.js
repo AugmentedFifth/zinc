@@ -218,7 +218,6 @@ Main.game = (canvas, ctx, ws) => {
     // Info on other players.
     const otherPlayers = new Map();
     const otherProjectiles = new Map();
-    const otherProjectilesBroken = new Map();
     let recvCount = 0;
     let lastRecv, recvDtAvg, lastRecvDt;
 
@@ -403,11 +402,11 @@ Main.game = (canvas, ctx, ws) => {
                             new Map();
                     /* jshint loopfunc: true */
                     projs.forEach((pj, id) => {
-                        //if (thisPlayersProjs.has(pj.id)) {
-
-                        //} else {
+                        if (thisPlayersProjs.has(id)) {
+                            thisPlayersProjs.get(id).pushPos(pj.pos);
+                        } else {
                             thisPlayersProjs.set(id, pj);
-                        //}
+                        }
                     });
                     /* jshint loopfunc: false */
                     otherProjectiles.set(name, thisPlayersProjs);

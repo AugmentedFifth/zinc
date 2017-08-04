@@ -23,9 +23,17 @@ cabal.project.local
 # Snap
 log/
 
+# IntelliJ IDEA
+.idea/
+.ideaHaskellLib/
+zinc.iml
+
+# VS Code
+.vscode/
+
 # Other
 null/
-.vscode/
+*.prof
 *.tar
 *.xz
 *.bz

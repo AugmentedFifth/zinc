@@ -49,8 +49,7 @@ data Client = Client
 
 type Key = V2 Double
 
-data Click = Click Double (# Double | V2 Double #)
-    deriving (Eq, Ord, Show)
+data Click = Click Double (# Word32 | V2 Double #)
 
 data Input = Input
     { _timeStamp :: Double
@@ -126,6 +125,19 @@ instance Show Client where
           ++ BC.unpack (_username c)
           ++ "}"
     {-# INLINE show #-}
+
+instance Show Click where
+    show (Click t (# i | #)) =
+        "Click " ++ show t ++ " (# " ++ show i ++ " | #)"
+    show (Click t (# | p #)) =
+        "Click " ++ show t ++ " (# | " ++ show p ++ " #)"
+    {-# INLINE show #-}
+
+instance Eq Click where
+    (==) (Click t1 (# i1 | #)) (Click t2 (# i2 | #)) = t1 == t2 && i1 == i2
+    (==) (Click t1 (# | p1 #)) (Click t2 (# | p2 #)) = t1 == t2 && p1 == p2
+    (==) _                     _                     = False
+    {-# INLINE (==) #-}
 
 instance Ord InputGroup where
     i1 <  i2 = _ordinal i1 <  _ordinal i2

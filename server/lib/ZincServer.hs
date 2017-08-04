@@ -43,6 +43,8 @@ module ZincServer
     , parseColor
     , parseInput
     , parseInputs
+    , parseClick
+    , parseClicks
     , parseInputGroup
     , serializeGameState
     , -- * Primary functions
@@ -80,8 +82,8 @@ import           Data.Foldable                 (foldl', for_)
 import           Data.Function                 ((&))
 import           Data.Map.Strict               ((!?))
 import qualified Data.Map.Strict               as Map
-import           Data.Maybe                    (fromJust, isNothing)
-import           Data.Sequence                 (Seq, (<|), (><), (|>))
+import           Data.Maybe                    (fromJust)
+import           Data.Sequence                 (Seq, (<|), (|>))
 import qualified Data.Sequence                 as Seq
 import qualified Data.Serialize.Get            as BG
 import           Data.Serialize.IEEE754        (getFloat64le, putFloat64le)
@@ -248,6 +250,7 @@ newPlayerState = PlayerState
     , _vel         = zero
     , _color       = Color 0 0 0
     , _inputQueue  = Seq.empty
+    , _projectiles = Seq.empty
     , _lastOrdinal = 0
     }
 {-# INLINE newPlayerState #-}
@@ -331,9 +334,9 @@ parseClick s =
         _                -> Nothing    # s
   where
     getClick = do
-        isDown    <- BG.getWord8
+        isDown'   <- BG.getWord8
         timestamp <- getFloat64le
-        if isDown == 0 then do
+        if isDown' == 0 then do
             clickId <- BG.getWord32le
             pure $ Click timestamp (# clickId | #)
         else do
@@ -477,7 +480,7 @@ processJoinGame joiner name clientReg gameReg = do
                 pure ()
 
 updateProjectile :: Double -> Projectile -> Projectile
-updateProjectile dt' (Projectile p (V2 vx vy) 0) =
+updateProjectile dt' (Projectile id' p v@(V2 vx vy) 0) =
     -- Adjust position based on velocity.
     let V2 px py = p + v ^* dt'
         -- Collision detection.
@@ -489,7 +492,7 @@ updateProjectile dt' (Projectile p (V2 vx vy) 0) =
             | px >= mainWidth  -> (# -vx, mainWidth,  True  #)
             | px <= 0          -> (# -vx, 0,          True  #)
             | otherwise        -> (#  vx, px,         False #)
-    in  Projectile (V2 px' py') (V2 vx' vy') (hitY || hitX ? 1 $ 0)
+    in  Projectile id' (V2 px' py') (V2 vx' vy') (hitY || hitX ? 1 $ 0)
 updateProjectile _ pj = pj
 
 -- | what
@@ -499,29 +502,34 @@ applyInputs ps =
         -- Spawn new projectiles, adjusting player velocity as necessary.
         let (_, _, projectiles', v') =
                 foldl' (\(lastPress', cid', pjs, v)
-                         (Click timestamp clickPos) ->
-                    let maybePjAndNewVel = do
-                        V2 px py  <- clickPos
-                        lastPress <- lastPress'
-                        cid       <- cid'
-                        let mouseDt = timestamp - lastPress
-                        let pPos = ps'^.pos
-                        let playerCenter = pPos + pure (side / 2)
-                        let dir = normalize $ clickPos - playerCenter
-                        if nullV dir then
-                            Nothing
-                        else
-                            let ratio =
-                                    min mouseDt maxHoldTime / maxHoldTime
-                                startPos =
-                                    playerCenter + side * 0.75 *^ dir
-                                projVel = maxProjVel * ratio *^ dir
-                                v1 = v + dir ^* (-ratio)
-                            in  pure (Projectile cid startPos projVel 0, v1)
-                    in  ( case clickPos of
+                         (Click timestamp idOrPos) ->
+                    let maybeClickPos = case idOrPos of
+                            (#   | p #) -> Just p
+                            (# _ |   #) -> Nothing
+                        maybePjAndNewVel = do
+                            clickPos  <- maybeClickPos
+                            lastPress <- lastPress'
+                            cid       <- cid'
+                            let mouseDt = timestamp - lastPress
+                            let pPos = ps'^.pos
+                            let playerCenter = pPos + pure (side / 2)
+                            let dir = normalize $ clickPos - playerCenter
+                            if nullV dir then
+                                Nothing
+                            else
+                                let ratio =
+                                        min mouseDt maxHoldTime / maxHoldTime
+                                    startPos =
+                                        playerCenter + side * 0.75 *^ dir
+                                    projVel = maxProjVel * ratio *^ dir
+                                    v1 = v + dir ^* (-ratio)
+                                in  pure ( Projectile cid startPos projVel 0
+                                         , v1
+                                         )
+                    in  ( case idOrPos of
                               (# _ |   #) -> Just timestamp
                               (#   | _ #) -> Nothing
-                        , case clickPos of
+                        , case idOrPos of
                               (# cid |   #) -> Just cid
                               (#     | _ #) -> Nothing
                         , case maybePjAndNewVel of
@@ -603,8 +611,8 @@ setProjsBroadcast :: Game -> Game
 setProjsBroadcast =
     (& players %~ fmap
         (& projectiles %~ fmap (\case
-            Projectile p v 1 -> Projectile p v 2
-            pj               -> pj)))
+            Projectile id' p v 1 -> Projectile id' p v 2
+            pj                   -> pj)))
 {-# INLINE setProjsBroadcast #-}
 
 broadcastLoop :: TVar Game -> IO ()
