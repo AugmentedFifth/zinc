@@ -364,6 +364,7 @@ Main.game = (canvas, ctx, ws) => {
                     const pvy = view.getFloat64(offset, true);
                     offset += 8;
                     const phase = view.getUint8(offset);
+                    //console.log(phase);
                     offset++;
                     projs.set(
                         id,
@@ -404,6 +405,7 @@ Main.game = (canvas, ctx, ws) => {
                     projs.forEach((pj, id) => {
                         if (thisPlayersProjs.has(id)) {
                             thisPlayersProjs.get(id).pushPos(pj.pos);
+                            thisPlayersProjs.get(id).isBroken = pj.isBroken;
                         } else {
                             thisPlayersProjs.set(id, pj);
                         }
@@ -588,7 +590,7 @@ Main.game = (canvas, ctx, ws) => {
             player.addVel(dir.scalarMult(-ratio));
         });
         if (lastPress !== undefined) {
-            mouseLog.unshift([lastPress, null]);
+            mouseLog.unshift([lastPress, lastClickId]);
         }
 
         // Get a copy of the keypress log to work with and then start a new
@@ -818,14 +820,6 @@ Main.game = (canvas, ctx, ws) => {
 
         // Draw projectiles.
         projectiles.forEach(drawProjectile(player));
-
-        // Update categorization of foreign projectiles.
-        otherProjectilesBroken.forEach((brokenPjs, playerName) =>
-            otherProjectilesBroken.set(
-                playerName,
-                brokenPjs.filter(p => !p.isDestroyed)
-            )
-        );
 
         // Draw foreign projectiles.
         otherProjectiles.forEach((pjs, playerName) => {

@@ -503,9 +503,11 @@ applyInputs ps =
         let (_, _, projectiles', v') =
                 foldl' (\(lastPress', cid', pjs, v)
                          (Click timestamp idOrPos) ->
-                    let maybeClickPos = case idOrPos of
-                            (#   | p #) -> Just p
-                            (# _ |   #) -> Nothing
+                    let (# lastPress'', cid, maybeClickPos #) = case idOrPos of
+                            (# cid |   #) ->
+                                (# Just timestamp, Just cid, Nothing #)
+                            (#     | p #) ->
+                                (# Nothing,        Nothing,  Just p  #)
                         maybePjAndNewVel = do
                             clickPos  <- maybeClickPos
                             lastPress <- lastPress'
@@ -526,12 +528,8 @@ applyInputs ps =
                                 in  pure ( Projectile cid startPos projVel 0
                                          , v1
                                          )
-                    in  ( case idOrPos of
-                              (# _ |   #) -> Just timestamp
-                              (#   | _ #) -> Nothing
-                        , case idOrPos of
-                              (# cid |   #) -> Just cid
-                              (#     | _ #) -> Nothing
+                    in  ( lastPress''
+                        , cid
                         , case maybePjAndNewVel of
                               Just (pj, _) -> pjs |> pj
                               _            -> pjs
