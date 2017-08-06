@@ -737,10 +737,10 @@ Main.game = (canvas, ctx, ws) => {
             // Collision detection with players.
             const projPlayerCollisionDetect = op => {
                 if (
-                    p.pos.y < op.pos.y          ||
-                    p.pos.y > op.pos.y + p.side ||
-                    p.pos.x < op.pos.x          ||
-                    p.pos.x > op.pos.x + p.side
+                    p.pos.y < op.pos.y           ||
+                    p.pos.y > op.pos.y + op.side ||
+                    p.pos.x < op.pos.x           ||
+                    p.pos.x > op.pos.x + op.side
                 ) {
                     return false;
                 }
@@ -758,7 +758,7 @@ Main.game = (canvas, ctx, ws) => {
                         p.vel.y = -p.vel.y;
                     }
                 } else {
-                    if (p.pos.x < p.pos.x - p.side / 2) {   // left
+                    if (p.pos.x < op.pos.x + op.side / 2) { // left
                         p.isBroken = true;
                         p.pos.x = op.pos.x;
                         p.vel.x = -p.vel.x;

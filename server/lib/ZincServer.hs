@@ -509,12 +509,12 @@ updateProjectile game dt' (Projectile id' p v@(V2 vx vy) 0) =
                         px'' < opx        ||
                         px'' > opx + side
                     then
-                        (v1, p1, hitPlayer', players'')
+                        (v1, p1, hitPlayer', Map.insert c ps players'')
                     else
                         let
                             obstacleCenter = op1 + pure (side / 2)
                             V2 dispX dispY = p1 - obstacleCenter
-                            dispVel = v1 ^/ (-maxProjVel)
+                            dispVel = v1 ^/ maxProjVel
                             knockBack = (& vel %~ (+ dispVel))
                             players''' = Map.insert c (knockBack ps) players''
                         in
@@ -525,7 +525,7 @@ updateProjectile game dt' (Projectile id' p v@(V2 vx vy) 0) =
                                     , True
                                     , players'''
                                     )
-                                else                        -- bottom
+                                else                          -- bottom
                                     ( V2 vx'' (-vy'')
                                     , V2 px'' (opy + side)
                                     , True
@@ -538,7 +538,7 @@ updateProjectile game dt' (Projectile id' p v@(V2 vx vy) 0) =
                                     , True
                                     , players'''
                                     )
-                                else                        -- right
+                                else                          -- right
                                     ( V2 (-vx'') vy''
                                     , V2 (opx + side) py''
                                     , True
@@ -577,13 +577,15 @@ applyInputs game client ps =
                             if nullV dir then
                                 Nothing
                             else
-                                let ratio =
+                                let
+                                    ratio =
                                         min mouseDt maxHoldTime / maxHoldTime
                                     startPos =
                                         playerCenter + side *^ dir
                                     projVel = maxProjVel * ratio *^ dir
                                     v1 = v + dir ^* (-ratio)
-                                in  pure ( Projectile cid''' startPos projVel 0
+                                in
+                                    pure ( Projectile cid''' startPos projVel 0
                                          , v1
                                          )
                     in  ( lastPress''
@@ -668,7 +670,8 @@ applyInputs game client ps =
                         then
                             (v1, p1)
                         else
-                            let V2 dispX dispY = p1 - op1
+                            let
+                                V2 dispX dispY = p1 - op1
                                 p1' =
                                     if abs dispY > abs dispX then
                                         if py < opy - side / 2 then
@@ -684,7 +687,8 @@ applyInputs game client ps =
                                 projection = (v1 - ps''^.vel) `dot` disp' /
                                              quadrance disp'
                                 massRatio = 1 -- 2 * mass / (mass + mass)
-                            in  (v1 - projection * massRatio *^ disp', p1')
+                            in
+                                (v1 - projection * massRatio *^ disp', p1')
                 ) (v''''', pos'')
                   (Map.filterWithKey (\c _ -> c /= client) $ game'^.players)
 
@@ -694,8 +698,7 @@ applyInputs game client ps =
             (projectiles''', game'') =
                 foldl' (\(pjs, game''') pj ->
                     let
-                        (# pj', game'''' #) =
-                            updateProjectile game''' dt' pj
+                        (# pj', game'''' #) = updateProjectile game''' dt' pj
                     in
                         (pjs |> pj', game'''')
                 ) (Seq.empty, game') projectiles''
