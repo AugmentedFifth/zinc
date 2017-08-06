@@ -68,6 +68,7 @@ module ZincServer
     ) where
 
 import           Control.Applicative           (pure, (<|>))
+import           Control.Arrow                 (first)
 import           Control.Concurrent            (forkIO, killThread,
                                                 threadDelay)
 import           Control.Concurrent.STM
@@ -479,39 +480,96 @@ processJoinGame joiner name clientReg gameReg = do
             _ ->
                 pure ()
 
-updateProjectile :: Double -> Projectile -> Projectile
-updateProjectile dt' (Projectile id' p v@(V2 vx vy) 0) =
+updateProjectile :: Game -> Double -> Projectile -> (# Projectile, Game #)
+updateProjectile game dt' (Projectile id' p v@(V2 vx vy) 0) =
+
     -- Adjust position based on velocity.
     let V2 px py = p + v ^* dt'
-        -- Collision detection.
+
+        -- Collision detection with arena bounds.
         (# vy', py', hitY #) = if
-            | py <= 0          -> (# -vy, 0,          True  #)
-            | py >= mainHeight -> (# -vy, mainHeight, True  #)
-            | otherwise        -> (#  vy, py,         False #)
+            | py <= 0          -> (# -vy, 0,          True  #) -- top
+            | py >= mainHeight -> (# -vy, mainHeight, True  #) -- bottom
+            | otherwise        -> (#  vy, py,         False #) -- none
         (# vx', px', hitX #) = if
-            | px >= mainWidth  -> (# -vx, mainWidth,  True  #)
-            | px <= 0          -> (# -vx, 0,          True  #)
-            | otherwise        -> (#  vx, px,         False #)
-    in  Projectile id' (V2 px' py') (V2 vx' vy') (hitY || hitX ? 1 $ 0)
-updateProjectile _ pj = pj
+            | px <= 0          -> (# -vx, 0,          True  #) -- left
+            | px >= mainWidth  -> (# -vx, mainWidth,  True  #) -- right
+            | otherwise        -> (#  vx, px,         False #) -- none
+
+        -- Collision detection with players.
+        (v', p', hitPlayer, players') =
+            Map.foldlWithKey' (\(v1@(V2 vx'' vy''),
+                                 p1@(V2 px'' py''),
+                                 hitPlayer',
+                                 players'') c ps ->
+                let op1@(V2 opx opy) = ps^.pos in
+                    if
+                        py'' < opy        ||
+                        py'' > opy + side ||
+                        px'' < opx        ||
+                        px'' > opx + side
+                    then
+                        (v1, p1, hitPlayer', players'')
+                    else
+                        let
+                            obstacleCenter = op1 + pure (side / 2)
+                            V2 dispX dispY = p1 - obstacleCenter
+                            dispVel = v1 ^/ (-maxProjVel)
+                            knockBack = (& vel %~ (+ dispVel))
+                            players''' = Map.insert c (knockBack ps) players''
+                        in
+                            if abs dispY > abs dispX then
+                                if py'' < opy + side / 2 then -- top
+                                    ( V2 vx'' (-vy'')
+                                    , V2 px'' opy
+                                    , True
+                                    , players'''
+                                    )
+                                else                        -- bottom
+                                    ( V2 vx'' (-vy'')
+                                    , V2 px'' (opy + side)
+                                    , True
+                                    , players'''
+                                    )
+                            else
+                                if px'' < opx + side / 2 then -- left
+                                    ( V2 (-vx'') vy''
+                                    , V2 opx py''
+                                    , True
+                                    , players'''
+                                    )
+                                else                        -- right
+                                    ( V2 (-vx'') vy''
+                                    , V2 (opx + side) py''
+                                    , True
+                                    , players'''
+                                    )
+            ) (V2 vx' vy', V2 px' py', False, Map.empty) (game^.players)
+
+        game' = game & players .~ players'
+
+    in  Projectile id' p' v' (hitY || hitX || hitPlayer ? 1 $ 0) # game'
+
+updateProjectile game _ pj = pj # game
 
 -- | what
-applyInputs :: PlayerState -> PlayerState
-applyInputs ps =
-    foldl' (\ps' inputGroup ->
+applyInputs :: Game -> Client -> PlayerState -> (PlayerState, Game)
+applyInputs game client ps =
+    first (& inputQueue .~ Seq.empty) $ foldl' (\(ps', game') inputGroup ->
+
         -- Spawn new projectiles, adjusting player velocity as necessary.
         let (_, _, projectiles', v') =
                 foldl' (\(lastPress', cid', pjs, v)
                          (Click timestamp idOrPos) ->
                     let (# lastPress'', cid, maybeClickPos #) = case idOrPos of
-                            (# cid |   #) ->
-                                (# Just timestamp, Just cid, Nothing #)
-                            (#     | p #) ->
-                                (# Nothing,        Nothing,  Just p  #)
+                            (# cid'' |   #) ->
+                                (# Just timestamp, Just cid'', Nothing #)
+                            (#       | p #) ->
+                                (# Nothing,        Nothing,    Just p  #)
                         maybePjAndNewVel = do
                             clickPos  <- maybeClickPos
                             lastPress <- lastPress'
-                            cid       <- cid'
+                            cid'''    <- cid'
                             let mouseDt = timestamp - lastPress
                             let pPos = ps'^.pos
                             let playerCenter = pPos + pure (side / 2)
@@ -522,10 +580,10 @@ applyInputs ps =
                                 let ratio =
                                         min mouseDt maxHoldTime / maxHoldTime
                                     startPos =
-                                        playerCenter + side * 0.75 *^ dir
+                                        playerCenter + side *^ dir
                                     projVel = maxProjVel * ratio *^ dir
                                     v1 = v + dir ^* (-ratio)
-                                in  pure ( Projectile cid startPos projVel 0
+                                in  pure ( Projectile cid''' startPos projVel 0
                                          , v1
                                          )
                     in  ( lastPress''
@@ -539,11 +597,14 @@ applyInputs ps =
                         )
                 ) (Nothing, Nothing, ps'^.projectiles, ps'^.vel)
                   (inputGroup^.clicks)
+
             -- Calculate accelerations for this frame based on input log.
             (v'', pressed', _, t_') = foldl' (\(v, pressed, t0', t_) inp ->
-                let t1   = inp^.timeStamp
+                let
+                    t1   = inp^.timeStamp
                     down = inp^.isDown
-                in  ( case t0' of
+                in
+                    ( case t0' of
                           Just t0 -> let thisDt = t1 - t0 in
                               if thisDt > 0 then
                                   let dir = (normalize . sum) pressed
@@ -561,11 +622,13 @@ applyInputs ps =
                     )
                 ) (v', Set.empty, Nothing, Nothing)
                   (inputGroup^.inputs)
+
             leftoverDir = (normalize . sum) pressed'
             v''' = if nullV leftoverDir then
                        v''
                    else let thisDt = (inputGroup^.now) - fromJust t_' in
                        v'' + leftoverDir ^* (appForce / mass * thisDt)
+
             -- Apply frictional forces.
             dt' = inputGroup^.dt
             v'''' = let frictionalDvNorm = -friction * dt'
@@ -573,11 +636,14 @@ applyInputs ps =
                         zero
                     else
                         v''' + normalize v''' ^* frictionalDvNorm
+
             -- Update position based on new velocity.
             pos' = (ps'^.pos) + v'''' ^* dt'
-            -- Collision detection.
+
+            -- Collision detection with arena bounds.
             (# v''''', pos'' #) =
-                let V2 vx vy = v''''
+                let
+                    V2 vx vy = v''''
                     V2 px py = pos'
                     (# vy', py' #) = if
                         | py <= 0                 -> -vy # 0
@@ -587,22 +653,73 @@ applyInputs ps =
                         | px >= mainWidth  - side -> -vx # mainWidth  - side
                         | px <= 0                 -> -vx # 0
                         | otherwise               ->  vx # px
-                in  V2 vx' vy' # V2 px' py'
+                in
+                    V2 vx' vy' # V2 px' py'
+
+            -- Collision detection with other players.
+            (v'''''', pos''') =
+                foldl' (\(v1, p1@(V2 px py)) ps'' ->
+                    let op1@(V2 opx opy) = ps''^.pos in
+                        if
+                            py < opy - side ||
+                            py > opy + side ||
+                            px < opx - side ||
+                            px > opx + side
+                        then
+                            (v1, p1)
+                        else
+                            let V2 dispX dispY = p1 - op1
+                                p1' =
+                                    if abs dispY > abs dispX then
+                                        if py < opy - side / 2 then
+                                            V2 px (opy - side)
+                                        else
+                                            V2 px (opy + side)
+                                    else
+                                        if px < opx - side / 2 then
+                                            V2 (opx - side) py
+                                        else
+                                            V2 (opx + side) py
+                                disp' = p1' - op1
+                                projection = (v1 - ps''^.vel) `dot` disp' /
+                                             quadrance disp'
+                                massRatio = 1 -- 2 * mass / (mass + mass)
+                            in  (v1 - projection * massRatio *^ disp', p1')
+                ) (v''''', pos'')
+                  (Map.filterWithKey (\c _ -> c /= client) $ game'^.players)
+
             -- Update projectile positions.
             notDestroyed (Projectile _ _ _ phase) = phase < 2
-            projectiles'' =
-                (fmap (updateProjectile dt') . Seq.filter notDestroyed)
-                    projectiles'
-        in  ps' & pos         .~ pos''
-                & vel         .~ v'''''
-                & projectiles .~ projectiles''
-                & lastOrdinal %~ max (inputGroup^.ordinal)
-    ) ps (ps^.inputQueue) & inputQueue .~ Seq.empty
+            projectiles'' = Seq.filter notDestroyed projectiles'
+            (projectiles''', game'') =
+                foldl' (\(pjs, game''') pj ->
+                    let
+                        (# pj', game'''' #) =
+                            updateProjectile game''' dt' pj
+                    in
+                        (pjs |> pj', game'''')
+                ) (Seq.empty, game') projectiles''
+
+        in  ( ps' & pos         .~ pos'''
+                  & vel         .~ v''''''
+                  & projectiles .~ projectiles'''
+                  & lastOrdinal %~ max (inputGroup^.ordinal)
+            , game''
+            )
+
+    ) (ps, game) (ps^.inputQueue)
 
 physicsLoop :: TVar Game -> IO ()
 physicsLoop game' = forever $ do
     threadDelay 15000
-    atomically $ modifyTVar' game' (& players %~ Map.map applyInputs)
+    modifyTVarIO game' (\game ->
+        Map.foldlWithKey' (\game'' c p ->
+            let
+                (p', game''') = applyInputs game'' c p
+            in
+                game''' & players %~ Map.insert c p'
+            ) game (game^.players)
+        )
 {-# INLINE physicsLoop #-}
 
 setProjsBroadcast :: Game -> Game

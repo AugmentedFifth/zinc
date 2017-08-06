@@ -16,7 +16,7 @@
 module ZincData where
 
 import           Control.Concurrent            (ThreadId)
-import           Control.Concurrent.STM
+import           Control.Concurrent.STM        (TVar)
 import           Control.Lens.Lens             (Lens', lens)
 
 import           Data.Bits                     ((.&.))

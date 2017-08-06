@@ -1001,6 +1001,15 @@ V2.prototype.map = function(f) {
     return new V2(f(this.x), f(this.y));
 };
 
+/**
+ * @param {number} n
+ * @return {V2}
+ */
+V2.pure = function(n) {
+    "use strict";
+    return new V2(n, n);
+};
+
 
 /* ====================| 2D rectangle implementation |==================== */
 

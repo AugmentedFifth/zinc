@@ -322,6 +322,7 @@ Main.game = (canvas, ctx, ws) => {
             return;
         }
 
+        // Handle ordinary game state packets.
         const view = new DataView(data.data, 1);
         let offset = 0;
         const playersSeen = new Set();
@@ -364,7 +365,6 @@ Main.game = (canvas, ctx, ws) => {
                     const pvy = view.getFloat64(offset, true);
                     offset += 8;
                     const phase = view.getUint8(offset);
-                    //console.log(phase);
                     offset++;
                     projs.set(
                         id,
@@ -449,11 +449,9 @@ Main.game = (canvas, ctx, ws) => {
             }
         }
 
-        otherPlayers.forEach((otherPlayer, name) => {
-            if (!playersSeen.has(name)) {
-                otherPlayers.delete(name);
-            }
-        });
+        // If this packet didn't contain state on a given player, that player
+        // no longer exists; so they are removed from the local state here.
+        otherPlayers.filter((otherPlayer, name) => playersSeen.has(name));
     };
 
     // Game main loop.
@@ -479,9 +477,9 @@ Main.game = (canvas, ctx, ws) => {
                 ctx.fillStyle = "rgba(212, 212, 212, 0.5)";
                 ctx.fillRect(
                     textWidth + 25,
-                    Main.height - 28 + 3,
+                    Main.height - 25,
                     12,
-                    18 - 16
+                    2
                 );
             }
         }
@@ -570,7 +568,7 @@ Main.game = (canvas, ctx, ws) => {
             const ratio = Math.min(mouseDt, maxHoldTime) / maxHoldTime;
 
             const startPos = player.center().add(
-                dir.scalarMult(player.side * 0.75)
+                dir.scalarMult(player.side)
             );
             const projVel = dir.scalarMult(Main.maxProjVel * ratio);
 
@@ -662,7 +660,7 @@ Main.game = (canvas, ctx, ws) => {
         // Update position based on new velocity.
         player.addPos(player.vel.scalarMult(dt));
 
-        // Collision detection.
+        // Collision detection with arena bounds.
         if (player.pos.y <= 0) { // Hit top
             player.vel.y = -player.vel.y;
             player.pos.y = 0;
@@ -677,12 +675,47 @@ Main.game = (canvas, ctx, ws) => {
             player.vel.x = -player.vel.x;
             player.pos.x = 0;
         }
+        // Collision detection with other players.
+        otherPlayers.forEach(p => {
+            if (
+                player.pos.y < p.pos.y - player.side ||
+                player.pos.y > p.pos.y + p.side      ||
+                player.pos.x < p.pos.x - player.side ||
+                player.pos.x > p.pos.x + p.side
+            ) {
+                return;
+            }
+
+            const disp = player.pos.sub(p.pos);
+            if (Math.abs(disp.y) > Math.abs(disp.x)) {
+                if (player.pos.y < p.pos.y - player.side / 2) { // top
+                    player.pos.y = p.pos.y - player.side;
+                } else { // bottom
+                    player.pos.y = p.pos.y + p.side;
+                }
+            } else {
+                if (player.pos.x < p.pos.x - player.side / 2) { // left
+                    player.pos.x = p.pos.x - player.side;
+                } else { // right
+                    player.pos.x = p.pos.x + p.side;
+                }
+            }
+
+            const projection =
+                player.vel.sub(p.vel).dot(
+                    player.pos.sub(p.pos)
+                ) / player.pos.sub(p.pos).quadrance();
+            const massRatio = 2 * p.mass / (player.mass + p.mass);
+            player.vel = player.vel.sub(
+                player.pos.sub(p.pos).scalarMult(projection * massRatio)
+            );
+        });
 
         // Update projectile positions.
         projectiles.forEach(p => {
             p.update(dt);
 
-            // Collision detection.
+            // Collision detection with arena bounds.
             if (p.pos.y <= 0) { // Hit top
                 p.isBroken = true;
                 p.pos.y = 0;
@@ -701,6 +734,45 @@ Main.game = (canvas, ctx, ws) => {
                 p.pos.x = 0;
                 p.vel.x = -p.vel.x;
             }
+            // Collision detection with players.
+            const projPlayerCollisionDetect = op => {
+                if (
+                    p.pos.y < op.pos.y          ||
+                    p.pos.y > op.pos.y + p.side ||
+                    p.pos.x < op.pos.x          ||
+                    p.pos.x > op.pos.x + p.side
+                ) {
+                    return false;
+                }
+
+                const obstacleCenter = op.center();
+                const disp = p.pos.sub(obstacleCenter);
+                if (Math.abs(disp.y) > Math.abs(disp.x)) {
+                    if (p.pos.y < op.pos.y + op.side / 2) { // top
+                        p.isBroken = true;
+                        p.pos.y = op.pos.y;
+                        p.vel.y = -p.vel.y;
+                    } else {                                // bottom
+                        p.isBroken = true;
+                        p.pos.y = op.pos.y + op.side;
+                        p.vel.y = -p.vel.y;
+                    }
+                } else {
+                    if (p.pos.x < p.pos.x - p.side / 2) {   // left
+                        p.isBroken = true;
+                        p.pos.x = op.pos.x;
+                        p.vel.x = -p.vel.x;
+                    } else {                                // right
+                        p.isBroken = true;
+                        p.pos.x = op.pos.x + op.side;
+                        p.vel.x = -p.vel.x;
+                    }
+                }
+                return true;
+            };
+
+            otherPlayers.forEach(projPlayerCollisionDetect);
+            projPlayerCollisionDetect(player);
         });
         projectiles.filter(p => !p.isDestroyed);
         // Also filter out destoyed foreign projectiles.
@@ -852,11 +924,6 @@ Main.game = (canvas, ctx, ws) => {
                 }
                 const otherPlayer = otherPlayers.get(playerName);
                 if (otherPlayer === undefined) {
-                    /*
-                    console.log(
-                        `Chat from absent player "${playerName}": ${msg}`
-                    );
-                    */
                     return;
                 }
                 return v2(
