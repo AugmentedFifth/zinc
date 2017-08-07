@@ -726,7 +726,7 @@ Main.game = (canvas, ctx, ws) => {
         });
 
         // Update projectile positions.
-        projectiles.forEach(p => {
+        const updateProj = p => {
             p.update(dt);
 
             // Collision detection with arena bounds.
@@ -756,9 +756,10 @@ Main.game = (canvas, ctx, ws) => {
                     p.pos.x < op.pos.x           ||
                     p.pos.x > op.pos.x + op.side
                 ) {
-                    return false;
+                    return undefined;
                 }
 
+                const projVelCopy = p.vel.clone();
                 const obstacleCenter = op.center();
                 const disp = p.pos.sub(obstacleCenter);
                 if (Math.abs(disp.y) > Math.abs(disp.x)) {
@@ -783,17 +784,21 @@ Main.game = (canvas, ctx, ws) => {
                     }
                 }
 
-                return true;
+                return projVelCopy;
             };
 
             otherPlayers.forEach(projPlayerCollisionDetect);
-            projPlayerCollisionDetect(player);
-        });
+            const oldProjVel = projPlayerCollisionDetect(player);
+            if (oldProjVel !== undefined) {
+                player.addVel(oldProjVel.scalarDiv(Main.maxProjVel));
+            }
+        };
+        projectiles.forEach(updateProj);
         projectiles.filter(p => !p.isDestroyed);
-        // Also filter out destoyed foreign projectiles.
+        // Update foreign projectiles.
         otherProjectiles.filter((pjs, name) => otherPlayers.has(name));
         otherProjectiles.forEach(pjs => {
-            pjs.forEach(pj => pj.update(dt));
+            pjs.forEach(updateProj);
             pjs.filter((id, p) => !p.isDestroyed);
         });
 

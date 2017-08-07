@@ -39,7 +39,8 @@ Projectile.prototype.update = function(dt) {
     "use strict";
     if (this.isBroken) {
         if (!this.hasBroken) {
-            const dustCount = randInt(6, 11);
+            this.dust = [];
+            const dustCount = randInt(6, 13);
             for (let i = 0; i < dustCount; ++i) {
                 this.dust.push([
                     this.pos.clone(),
@@ -64,9 +65,13 @@ Projectile.prototype.update = function(dt) {
                 return [newPos, newVel];
             }).filter(d => Main.isInCanvas(d[0]));
         }
-    } else if (!this.isDestroyed) {
-        this.pos = this.pos.add(this.vel.scalarMult(dt));
-        this.angPos = this.angPos + this.angVel * dt;
+    } else {
+        this.hasBroken = false;
+        this.isDestroyed = false;
+        if (!this.isDestroyed) {
+            this.pos = this.pos.add(this.vel.scalarMult(dt));
+            this.angPos = this.angPos + this.angVel * dt;
+        }
     }
 };
 
