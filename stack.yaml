@@ -1,7 +1,3 @@
-# Some commonly used options have been documented as comments in this file.
-# For advanced use and comprehensive documentation of the format, please see:
-# http://docs.haskellstack.org/en/stable/yaml_configuration/
-
 # Resolver to choose a 'specific' stackage snapshot or a compiler version.
 # A snapshot resolver dictates the compiler version and the set of packages
 # to be used for project dependencies. For example:
@@ -58,10 +54,10 @@ extra-deps: [ adjunctions-4.3
             , io-streams-1.4.0.0
             , io-streams-haproxy-1.0.0.1
             , kan-extensions-5.0.2
-            , lens-4.15.3
+            , lens-4.15.4
             , lifted-base-0.2.3.11
-            , linear-1.20.6
-            , monad-control-1.0.2.1
+            , linear-1.20.7
+            , monad-control-1.0.2.2
             , mtl-2.2.1
             , network-2.6.3.2
             , network-info-0.2.0.8
@@ -72,14 +68,14 @@ extra-deps: [ adjunctions-4.3
             , prelude-extras-0.4.0.3
             , primitive-0.6.2.0
             , process-1.4.3.0
-            , profunctors-5.2
+            , profunctors-5.2.1
             , random-1.1
             , readable-0.3.1
             , reflection-2.1.2
             , regex-base-0.93.2
             , regex-posix-0.95.2
             , scientific-0.3.5.1
-            , semigroupoids-5.2
+            , semigroupoids-5.2.1
             , semigroups-0.18.3
             , SHA-1.6.4.2
             , snap-core-1.0.2.1
@@ -100,7 +96,7 @@ extra-deps: [ adjunctions-4.3
             , uuid-types-1.0.3
             , vector-0.12.0.1
             , void-0.7.2
-            , websockets-0.12.1.0
+            , websockets-0.12.2.0
             , websockets-snap-0.10.2.3
             , zlib-0.6.1.2
             , zlib-bindings-0.1.1.5

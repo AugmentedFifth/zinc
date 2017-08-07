@@ -5,14 +5,15 @@
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
--- | Module      : ZincData
---   Description : Data/type definitions, instances, and lenses for the /zinc/
---                     game.
---   Copyright   : [copyleft] AugmentedFifth, 2017
---   License     : AGPL-3
---   Maintainer  : zcomito@gmail.com
---   Stability   : experimental
---   Portability : POSIX
+{-| Module      : ZincData
+    Description : Data/type definitions, instances, and lenses for the /zinc/
+                      game.
+    Copyright   : [copyleft] AugmentedFifth, 2017
+    License     : AGPL-3
+    Maintainer  : zcomito@gmail.com
+    Stability   : experimental
+    Portability : POSIX
+-}
 module ZincData where
 
 import           Control.Concurrent            (ThreadId)
@@ -58,7 +59,8 @@ data Input = Input
     } deriving (Eq, Show)
 
 data InputGroup = InputGroup
-    { _ordinal :: Word32
+    { _client' :: Client
+    , _ordinal :: Word32
     , _now     :: Double
     , _dt      :: Double
     , _inputs  :: Seq Input
@@ -82,7 +84,6 @@ data PlayerState = PlayerState
     { _pos         :: V2 Double
     , _vel         :: V2 Double
     , _color       :: Color
-    , _inputQueue  :: Seq InputGroup
     , _projectiles :: Seq Projectile
     , _lastOrdinal :: Word32
     } deriving (Show)
@@ -92,6 +93,7 @@ type GameState = Int
 data Game = Game
     { _gameName        :: ByteString
     , _players         :: Map Client PlayerState
+    , _inputQueue      :: Seq InputGroup
     , _gameState       :: GameState
     , _physicsLoopId   :: Maybe ThreadId
     , _broadcastLoopId :: Maybe ThreadId
@@ -250,6 +252,10 @@ isDown :: Lens' Input Bool
 isDown = lens _isDown (\i d -> i { _isDown = d })
 {-# INLINE isDown #-}
 
+client' :: Lens' InputGroup Client
+client' = lens _client' (\ig c -> ig { _client' = c })
+{-# INLINE client' #-}
+
 ordinal :: Lens' InputGroup Word32
 ordinal = lens _ordinal (\ig o -> ig { _ordinal = o })
 {-# INLINE ordinal #-}
@@ -282,10 +288,6 @@ color :: Lens' PlayerState Color
 color = lens _color (\ps c -> ps { _color = c })
 {-# INLINE color #-}
 
-inputQueue :: Lens' PlayerState (Seq InputGroup)
-inputQueue = lens _inputQueue (\ps iq -> ps { _inputQueue = iq })
-{-# INLINE inputQueue #-}
-
 projectiles :: Lens' PlayerState (Seq Projectile)
 projectiles = lens _projectiles (\ps pj -> ps { _projectiles = pj })
 {-# INLINE projectiles #-}
@@ -301,6 +303,10 @@ gameName = lens _gameName (\g gn -> g { _gameName = gn })
 players :: Lens' Game (Map Client PlayerState)
 players = lens _players (\g ps -> g { _players = ps })
 {-# INLINE players #-}
+
+inputQueue :: Lens' Game (Seq InputGroup)
+inputQueue = lens _inputQueue (\g iq -> g { _inputQueue = iq })
+{-# INLINE inputQueue #-}
 
 gameState :: Lens' Game GameState
 gameState = lens _gameState (\g gs -> g { _gameState = gs })

@@ -11,26 +11,26 @@ copyright:          2017 Zachary Comito
 category:           Web
 build-type:         Simple
 extra-source-files: README.md
-cabal-version:      >= 1.10
+cabal-version:      >= 2.0.0.2
 
 library
   hs-source-dirs:     server/lib
   exposed-modules:    ZincServer
                     , ZincData
-  build-depends:      base            >= 4.7      && < 5
-                    , bytestring      >= 0.9.1    && < 0.11
-                    , cereal          >= 0.5.4.0  && < 0.6
-                    , containers      >= 0.5.10   && < 0.6
-                    , lens            >= 4.15.3   && < 5
-                    , linear          >= 1.20.6   && < 1.30
-                    , monad-control   >= 1.0      && < 1.1
-                    , mtl             >= 2        && < 3
-                    , snap-core       >= 1.0      && < 1.1
-                    , snap-server     >= 1.0      && < 1.1
-                    , stm             >= 2.4.4.1  && < 2.5
-                    , uuid            >= 1.3.13   && < 1.5
-                    , websockets      >= 0.12.1   && < 0.14
-                    , websockets-snap >= 0.10.2.3 && < 0.11
+  build-depends:      base            >= 4.10.0.0
+                    , bytestring      >= 0.10.8.2
+                    , cereal          >= 0.5.4.0
+                    , containers      >= 0.5.10.2
+                    , lens            >= 4.15.4
+                    , linear          >= 1.20.7
+                    , monad-control   >= 1.0.2.2
+                    , mtl             >= 2.2.1
+                    , snap-core       >= 1.0.2.1
+                    , snap-server     >= 1.0.2.2
+                    , stm             >= 2.4.4.1
+                    , uuid            >= 1.3.13
+                    , websockets      >= 0.12.2.0
+                    , websockets-snap >= 0.10.2.3
   default-language:   Haskell2010
 
 executable zinc
@@ -39,7 +39,7 @@ executable zinc
   default-extensions:   Strict
   ghc-options:          -O2 -funbox-strict-fields -threaded -rtsopts "-with-rtsopts=-N" -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates -Wmissing-import-lists -fprint-unicode-syntax -fwarn-tabs
 
-  build-depends:        base >= 4.7 && < 5
+  build-depends:        base >= 4.10.0.0
                       , zinc
 
   default-language:     Haskell2010

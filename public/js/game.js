@@ -378,6 +378,20 @@ Main.game = (canvas, ctx, ws) => {
                 }
                 const lastOrdinal = view.getUint32(offset, true);
                 offset += 4;
+                /*
+                console.log(
+                    "pos:",
+                    v2(px, py),
+                    "vel:",
+                    v2(vx, vy),
+                    "color:",
+                    `#${red}${green}${blue}`,
+                    "projs:",
+                    projs,
+                    "last ordinal:",
+                    lastOrdinal
+                );
+                */
                 if (isOtherPlayer) {
                     if (otherPlayers.has(name)) {
                         const otherPlayer = otherPlayers.get(name);
@@ -455,7 +469,7 @@ Main.game = (canvas, ctx, ws) => {
     };
 
     // Game main loop.
-    function aboutPage(displacement, dt) {
+    function gameMainLoop(displacement, dt) {
         // Fill in the background.
         ctx.save();
         ctx.fillStyle = darkBgPattern;
@@ -690,13 +704,13 @@ Main.game = (canvas, ctx, ws) => {
             if (Math.abs(disp.y) > Math.abs(disp.x)) {
                 if (player.pos.y < p.pos.y - player.side / 2) { // top
                     player.pos.y = p.pos.y - player.side;
-                } else { // bottom
+                } else {                                        // bottom
                     player.pos.y = p.pos.y + p.side;
                 }
             } else {
                 if (player.pos.x < p.pos.x - player.side / 2) { // left
                     player.pos.x = p.pos.x - player.side;
-                } else { // right
+                } else {                                        // right
                     player.pos.x = p.pos.x + p.side;
                 }
             }
@@ -768,6 +782,7 @@ Main.game = (canvas, ctx, ws) => {
                         p.vel.x = -p.vel.x;
                     }
                 }
+
                 return true;
             };
 
@@ -956,5 +971,5 @@ Main.game = (canvas, ctx, ws) => {
         drawClickEffect(ctx, mouseState, dt);
     }
 
-    return aboutPage;
+    return gameMainLoop;
 };
