@@ -5,7 +5,7 @@ class ChatHandler {
 
     public cursorTime: number = 0;
 
-    private chatBubbles: Map<string, [number, string]> = new Map();
+    private chatBubbles = new Map<string, [number, string]>();
 
     static readonly cursorPeriod: number = 1024;
 

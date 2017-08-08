@@ -1,0 +1,63 @@
+{
+    "parse": {
+        "bare_returns": false
+    },
+    "compress": {
+        "sequences": true,
+        "properties": true,
+        "dead_code": false,
+        "drop_debugger": true,
+        "unsafe": false,
+        "comparisons": true,
+        "unsafe_comps": true,
+        "unsafe_Func": false,
+        "unsafe_math": false,
+        "unsafe_proto": true,
+        "unsafe_regexp": false,
+        "conditionals": true,
+        "evaluate": true,
+        "arrows": true,
+        "booleans": true,
+        "typeofs": true,
+        "loops": true,
+        "unused": false,
+        "toplevel": false,
+        "hoist_funs": false,
+        "hoist_vars": false,
+        "if_return": true,
+        "inline": true,
+        "join_vars": true,
+        "cascade": true,
+        "collapse_vars": false,
+        "reduce_vars": true,
+        "warnings": true,
+        "negate_iife": true,
+        "pure_getters": false,
+        "drop_console": false,
+        "expression": false,
+        "keep_fargs": false,
+        "keep_fnames": true,
+        "passes": 4,
+        "keep_infinity": false,
+        "side_effects": false,
+        "ecma": 8
+    },
+    "mangle": {
+        "reserved": [],
+        "toplevel": false,
+        "keep_classnames": true,
+        "keep_fnames": true,
+        "eval": false,
+        "safari10": false
+    },
+    "output": {
+        "ecma": 8,
+        "beautify": false,
+        "semicolons": false
+    },
+    "ecma": 8,
+    "nameCache": null,
+    "toplevel": false,
+    "ie8": false,
+    "warnings": true
+}

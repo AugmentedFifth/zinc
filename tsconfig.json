@@ -4,8 +4,7 @@
             "esnext",
             "dom",
             "dom.iterable",
-            "scripthost",
-            "webworker"
+            "scripthost"
         ],
         "module": "esnext",
         "newLine": "LF",
@@ -13,8 +12,12 @@
         "noFallthroughCasesInSwitch": true,
         "noImplicitReturns": true,
         "noUnusedLocals": true,
+        "outDir": "public/js",
         "pretty": true,
         "strict": true,
         "target": "esnext"
-    }
+    },
+    "include": [
+        "public/ts/?*.ts"
+    ]
 }
