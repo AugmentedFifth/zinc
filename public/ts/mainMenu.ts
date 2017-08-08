@@ -49,7 +49,7 @@ Main.loops.mainMenu = (canvas, ctx) => {
     const mouseState = new MouseState(canvas, eventListeners, buttons);
 
     // Main menu loop.
-    function mainMenu(displacement: V2, dt: number) {
+    function mainMenu(displacement: V2, dt: number): void {
         // Fill in the background.
         ctx.save();
         ctx.fillStyle = darkBgPattern;

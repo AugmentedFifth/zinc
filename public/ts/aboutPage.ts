@@ -62,7 +62,7 @@ Main.loops.aboutPage = (canvas, ctx) => {
         ];
 
     // About page main loop.
-    function aboutPage(displacement: V2, dt: number) {
+    function aboutPage(displacement: V2, dt: number): void {
         // Fill in the background.
         ctx.save();
         ctx.fillStyle = darkBgPattern;

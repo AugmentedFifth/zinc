@@ -1,19 +1,19 @@
 class ChatHandler {
+    public  static readonly cursorPeriod:      number = 1024;
+
+    private static readonly chatDisplayPeriod: number = 5000;
+    private static readonly maxTextLength:     number = 96;
+    private static readonly maxLineLen:        number = 24;
+
     public active: boolean = false;
 
     public text: string = "";
 
     public cursorTime: number = 0;
 
-    private chatBubbles = new Map<string, [number, string]>();
+    private chatBubbles: Map<string, [number, string]> = new Map();
 
-    static readonly cursorPeriod: number = 1024;
-
-    private static readonly maxTextLength:     number = 96;
-    private static readonly chatDisplayPeriod: number = 5000;
-    private static readonly maxLineLen:        number = 24;
-
-    constructor(
+    public constructor(
         eventListeners:       EventRegistrar,
         ws:                   WebSocket,
         keypressLogPush:      (kp: [number, string, boolean]) => void,
@@ -60,15 +60,15 @@ class ChatHandler {
         eventListeners.register(window, "keydown", _chatKeydown);
     }
 
-    incrementCursorTime(dt: number): void {
+    public incrementCursorTime(dt: number): void {
         this.cursorTime = (this.cursorTime + dt) % ChatHandler.cursorPeriod;
     }
 
-    addChatBubble(playerName: string, msg: string): void {
+    public addChatBubble(playerName: string, msg: string): void {
         this.chatBubbles.set(playerName, [window.performance.now(), msg]);
     }
 
-    newFrame(): Map<string, [number, string]> {
+    public newFrame(): Map<string, [number, string]> {
         const now = window.performance.now();
         this.chatBubbles.filter(
             ([t]) => t + ChatHandler.chatDisplayPeriod >= now
@@ -76,7 +76,7 @@ class ChatHandler {
         return this.chatBubbles;
     }
 
-    static splitMsg(msg: string): string[] {
+    public static splitMsg(msg: string): string[] {
         const split = msg.split(" ");
         const lines = [];
         let line = "";

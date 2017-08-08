@@ -7,7 +7,7 @@ class Player {
     private lastVel: V2 = V2.zero();
     public  lerpVel: V2 = V2.zero();
 
-    constructor(
+    public constructor(
         public pos:      V2,
         public mass:     number,
         public appForce: number,
@@ -22,23 +22,23 @@ class Player {
     /**
      * Add displacement.
      */
-    addPos(d: V2): void {
+    public addPos(d: V2): void {
         this.pos = this.pos.add(d);
     }
 
     /**
      * Add velocity.
      */
-    addVel(v: V2): void {
+    public addVel(v: V2): void {
         this.vel = this.vel.add(v);
     }
 
-    pushPos(newPos: V2): void {
+    public pushPos(newPos: V2): void {
         this.lastPos = this.lerpPos;
         this.pos = newPos;
     }
 
-    pushVel(newVel: V2): void {
+    public pushVel(newVel: V2): void {
         this.lastVel = this.lerpVel;
         this.vel = newVel;
     }
@@ -46,7 +46,7 @@ class Player {
     /**
      * Sets `this.lerpPos` and `this.lerpVel`.
      */
-    lerp(ratio: number): void {
+    public lerp(ratio: number): void {
         this.lerpPos = this.pos.scalarMult(ratio).add(
             this.lastPos.scalarMult(1 - ratio)
         );
@@ -55,7 +55,7 @@ class Player {
     /**
      * Returns a `V2` representing the position of the center of this player.
      */
-    center(): V2 {
+    public center(): V2 {
         return this.pos.add(v2(this.side / 2, this.side / 2));
     }
 }

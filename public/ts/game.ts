@@ -60,8 +60,8 @@ Main.loops.game = (canvas, ctx, ws) => {
     const waitingForConfirmation: Map<number, [V2, Map<number, V2>]> =
         new Map();
 
-    let projectiles: Map<number, Projectile> = new Map();
-    let lastMouseDown: number | undefined = undefined;
+    const projectiles: Map<number, Projectile> = new Map();
+    let lastMouseDown: number | undefined;
     const maxHoldTime = 2000; // milliseconds
     const minHoldTime = 200;
 
@@ -232,8 +232,8 @@ Main.loops.game = (canvas, ctx, ws) => {
     const otherPlayers: Map<string, Player> = new Map();
     const otherProjectiles: Map<string, Map<number, Projectile>> = new Map();
     let recvCount = 0;
-    let lastRecv: number | undefined = undefined;
-    let recvDtAvg: number | undefined = undefined;
+    let lastRecv: number | undefined;
+    let recvDtAvg: number | undefined;
     let lastRecvDt;
 
     // Extra drawing function for projectiles.
@@ -313,10 +313,10 @@ Main.loops.game = (canvas, ctx, ws) => {
         if (bytes[0] === 0x03) {
             const nameLength = bytes[1];
             let name = "";
-            let offset = 2;
+            let offset_ = 2;
             for (let i = 0; i < nameLength; ++i) {
-                name += String.fromCharCode(bytes[offset]);
-                offset++;
+                name += String.fromCharCode(bytes[offset_]);
+                offset_++;
             }
 
             if (name !== Main.username && !otherPlayers.has(name)) {
@@ -327,9 +327,9 @@ Main.loops.game = (canvas, ctx, ws) => {
             }
 
             let chatMsg = "";
-            while (offset < bytes.length) {
-                chatMsg += String.fromCharCode(bytes[offset]);
-                offset++;
+            while (offset_ < bytes.length) {
+                chatMsg += String.fromCharCode(bytes[offset_]);
+                offset_++;
             }
 
             chatHandler.addChatBubble(name, chatMsg);
@@ -414,7 +414,7 @@ Main.loops.game = (canvas, ctx, ws) => {
                         otherPlayer.pushVel(v2(vx, vy));
                         otherPlayer.color = `#${red}${green}${blue}`;
                     } else {
-                        const otherPlayer = new Player(
+                        const newOtherPlayer = new Player(
                             v2(px, py),
                             12,
                             3e-2,
@@ -422,8 +422,8 @@ Main.loops.game = (canvas, ctx, ws) => {
                             48,
                             `#${red}${green}${blue}`
                         );
-                        otherPlayer.vel = v2(vx, vy);
-                        otherPlayers.set(name, otherPlayer);
+                        newOtherPlayer.vel = v2(vx, vy);
+                        otherPlayers.set(name, newOtherPlayer);
                     }
 
                     const thisPlayersProjs_ = otherProjectiles.get(name);
@@ -487,7 +487,7 @@ Main.loops.game = (canvas, ctx, ws) => {
     };
 
     // Game main loop.
-    function gameMainLoop(displacement: V2, dt: number) {
+    function gameMainLoop(displacement: V2, dt: number): void {
         // Fill in the background.
         ctx.save();
         ctx.fillStyle = darkBgPattern;
@@ -574,8 +574,8 @@ Main.loops.game = (canvas, ctx, ws) => {
         // Spawn new projectiles.
         const mouseLogCopy = mouseLog;
         mouseLog = [];
-        let lastPress:   number | undefined = undefined;
-        let lastClickId: number | undefined = undefined;
+        let lastPress:   number | undefined;
+        let lastClickId: number | undefined;
         mouseLogCopy.forEach(([timestamp, clickPosOrId]) => {
             if (typeof clickPosOrId === "number") {
                 lastPress = timestamp;
@@ -635,7 +635,8 @@ Main.loops.game = (canvas, ctx, ws) => {
 
         // Calculate accelerations for this frame based on keypress log.
         const pressed = new Set();
-        let t0, t_;
+        let t0;
+        let t_;
         for (let i = 0; i < keypressLogCopy.length; ++i) {
             const [t1, key, down] = keypressLogCopy[i];
 
@@ -818,7 +819,7 @@ Main.loops.game = (canvas, ctx, ws) => {
         otherProjectiles.filter((pjs, name: string) => otherPlayers.has(name));
         otherProjectiles.forEach(pjs => {
             pjs.forEach(updateProj);
-            pjs.filter((id, p: Projectile) => !p.isDestroyed);
+            pjs.filter((p: Projectile) => !p.isDestroyed);
         });
 
         // Saving calculated position to be confirmed by server later.

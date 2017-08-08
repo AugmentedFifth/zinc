@@ -56,7 +56,8 @@ Main.loops.newGame = (canvas, ctx, ws) => {
         , [rect(240, 380, 800, 45), "", false, 32]
         ];
 
-    let gameName: string, username: string;
+    let gameName: string;
+    let username: string;
     let alertText: string[] = [];
 
     const wrongLength: (fb: FormBox) => boolean =
@@ -98,7 +99,7 @@ Main.loops.newGame = (canvas, ctx, ws) => {
             startGameCallback();
         }
     };
-    function startCallback() {
+    function startCallback(): void {
         if (formBoxes.some(wrongLength)) {
             alertText =
                 [ "Make sure that both names are at least 2 characters"
@@ -193,7 +194,7 @@ Main.loops.newGame = (canvas, ctx, ws) => {
     const mouseState = new MouseState(canvas, eventListeners, buttons);
 
     // New game page main loop.
-    function newGame(displacement: V2, dt: number) {
+    function newGame(displacement: V2, dt: number): void {
         // Fill in the background.
         ctx.save();
         ctx.fillStyle = darkBgPattern;

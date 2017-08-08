@@ -47,7 +47,7 @@ Array.prototype.toString = function(): string {
 
 
 interface Set<T> {
-    foldl: <S>(fold: (accu: S, x: T) => S, seed: S) => S;
+    foldl<S>(fold: (accu: S, x: T) => S, seed: S): S;
 }
 
 /**
@@ -60,13 +60,13 @@ Set.prototype.foldl = function<T, S>(fold: (accu: S, x: T) => S, seed: S): S {
 
 
 interface Map<K, V> {
-    clearKeysUpTo: <K, V>(n: K) => Map<K, V>;
-    filter: <K, V>(
+    clearKeysUpTo(n: K): Map<K, V>;
+    filter(
         f: (val: V, key: K, _this: Map<K, V>) => boolean
-    ) => Map<K, V>;
-    adjust: <K, V>(
+    ): Map<K, V>;
+    adjust(
         toAdjust: K, f: (val: V, key: K, _this: Map<K, V>) => V
-    ) => Map<K, V>;
+    ): Map<K, V>;
 }
 
 /**
@@ -136,7 +136,7 @@ class CircularBuffer<T> {
      * The `head` and `tail` both start at `0`. The `inhabited` property is a
      * count of how many non-zero elements there are in the buffer.
      */
-    constructor(public capacity: number) {
+    public constructor(public capacity: number) {
         if (capacity < 1 || capacity % 1 !== 0) {
             throw new Error(
                 "CircularBuffer: capacity must be a positive integer. " +
@@ -146,12 +146,13 @@ class CircularBuffer<T> {
     }
 
     /** **_Internal use only._** */
-    _buffer: (T | null)[] | TypedArray = Array(this.capacity).fill(null);
+    public _buffer: (T | null)[] | TypedArray =
+        Array(this.capacity).fill(null);
 
-    head: number = 0;
-    tail: number = 0;
-    inhabited: number = 0;
-    isArray: boolean = true;
+    public head: number = 0;
+    public tail: number = 0;
+    public inhabited: number = 0;
+    public isArray: boolean = true;
 
     /**
      * Creates a new `CircularBuffer` from the given `Array` or `TypedArray`.
@@ -160,7 +161,9 @@ class CircularBuffer<T> {
      * aren't `0`, since `TypedArray`s store primitives and thus cannot be
      * `null`ed.
      */
-    static fromArray<T>(array: (T | null)[] | TypedArray): CircularBuffer<T> {
+    public static fromArray<T>(
+        array: (T | null)[] | TypedArray
+    ): CircularBuffer<T> {
         const isArray = Array.isArray(array);
         if (isArray && array.length < 1) {
             throw new Error(
@@ -194,7 +197,7 @@ class CircularBuffer<T> {
      * "[object CircularBuffer(`capacity`) capacity `capacity` head `head` tail
      * `tail` inhabited `inhabited` isArray `isArray`]"
      */
-    toString(): string {
+    public toString(): string {
         return `[object CircularBuffer(${this.capacity}) capacity ` +
                `${this.capacity} head ${this.head} tail ${this.tail} ` +
                `inhabited ${this.inhabited} isArray ${this.isArray}]`;
@@ -209,7 +212,9 @@ class CircularBuffer<T> {
      * If the old `head` was overlapping the `tail` and that spot was
      * inhabited, then the `tail` is shifted forward by one as well.
      */
-    cons(val: T | null | number): T | null | number {
+    public cons(val: T | null): T | null;
+    public cons(val: number): number;
+    public cons(val: T | null | number): T | null | number {
         const oldVal = this._buffer[this.head];
         this._buffer[this.head] = val;
         const zeroElement = this.isArray ? null : 0;
@@ -226,7 +231,8 @@ class CircularBuffer<T> {
     /**
      * Alias for the `CircularBuffer.cons()` method.
      */
-    push = this.cons;
+    // tslint:disable-next-line:typedef
+    public push = this.cons;
 
     /**
      * Acts as the inverse of `CircularBuffer.cons()`, removing and returning
@@ -236,7 +242,7 @@ class CircularBuffer<T> {
      * **Note** that this will function even if the "element" being unconsed is
      * actually uninhabited (i.e. it is the zero element).
      */
-    uncons(): T | null | number {
+    public uncons(): T | null | number {
         this._decrement_head();
         const oldVal = this._buffer[this.head];
         const zeroElement = this.isArray ? null : 0;
@@ -250,7 +256,8 @@ class CircularBuffer<T> {
     /**
      * Alias for the `CircularBuffer.uncons()` method.
      */
-    pop = this.cons;
+    // tslint:disable-next-line:typedef
+    public pop = this.cons;
 
     /**
      * Acts like `CircularBuffer.cons()`, but puts an element onto the `tail`
@@ -259,7 +266,7 @@ class CircularBuffer<T> {
      * If `tail` pointed to the same spot as `head` before the "snoc", then
      * `head` is also pushed back by 1.
      */
-    snoc(val: T | null | number): T | null | number {
+    public snoc(val: T | null | number): T | null | number {
         if (this.tail === this.head) {
             this._decrement_head();
         }
@@ -276,7 +283,8 @@ class CircularBuffer<T> {
     /**
      * Alias for the `CircularBuffer.snoc()` method.
      */
-    shift = this.snoc;
+    // tslint:disable-next-line:typedef
+    public shift = this.snoc;
 
     /**
      * Acts as the inverse of `CircularBuffer.snoc()`, removing and returning
@@ -286,7 +294,7 @@ class CircularBuffer<T> {
      * If `tail` and `head` pointed to the same spot before the "unsnoc", then
      * the `head` cursor is also advanced by 1.
      */
-    unsnoc(): T | null | number {
+    public unsnoc(): T | null | number {
         if (this.tail === this.head) {
             this._increment_head();
         }
@@ -303,7 +311,8 @@ class CircularBuffer<T> {
     /**
      * Alias for the `CircularBuffer.unsnoc()` method.
      */
-    unshift = this.unsnoc;
+    // tslint:disable-next-line:typedef
+    public unshift = this.unsnoc;
 
     /**
      * Gets the value at a specified index in the `CircularBuffer`'s stack.
@@ -324,9 +333,9 @@ class CircularBuffer<T> {
      * Negative indices walk backward, and going off the end of the buffer
      * wraps circularly as expected.
      */
-    get(i?: number): T | null;
-    get(i?: number): number;
-    get(i: number = 0): T | null | number {
+    public get(i?: number): T | null;
+    public get(i?: number): number;
+    public get(i: number = 0): T | null | number {
         if (i % 1 !== 0) {
             throw new Error(
                 `CircularBuffer.get(): i must be an integer. Got: ${i}`
@@ -353,9 +362,9 @@ class CircularBuffer<T> {
      * Negative indices walk backward, and going off the end of the buffer
      * wraps circularly as expected.
      */
-    peek(i?: number): T | null;
-    peek(i?: number): number;
-    peek(i: number = 0): T | null | number {
+    public peek(i?: number): T | null;
+    public peek(i?: number): number;
+    public peek(i: number = 0): T | null | number {
         if (i % 1 !== 0) {
             throw new Error(
                 `CircularBuffer.peek(): i must be an integer. Got: ${i}`
@@ -375,7 +384,7 @@ class CircularBuffer<T> {
      * Negative indices walk backward, and going off the end of the buffer
      * wraps circularly as expected.
      */
-    bufferGet(i: number): T | null | number {
+    public bufferGet(i: number): T | null | number {
         if (i % 1 !== 0) {
             throw new Error(
                 `CircularBuffer.bufferGet(): i must be an integer. Got: ${i}`
@@ -389,7 +398,7 @@ class CircularBuffer<T> {
      * and then returns the old value. Also, `i` is not optional for this
      * method.
      */
-    set(i: number, val: T | null | number): T | null | number {
+    public set(i: number, val: T | null | number): T | null | number {
         if (typeof i !== "number" || i % 1 !== 0) {
             throw new Error(
                 `CircularBuffer.set(): i must be an integer. Got: ${i}`
@@ -409,7 +418,7 @@ class CircularBuffer<T> {
      * Behaves like `CircularBuffer.bufferGet()`, but sets the value at that
      * position and then returns the old value.
      */
-    bufferSet(i: number, val: T | null | number): T | null | number {
+    public bufferSet(i: number, val: T | null | number): T | null | number {
         if (i % 1 !== 0) {
             throw new Error(
                 `CircularBuffer.bufferSet(): i must be an integer. Got: ${i}`
@@ -429,7 +438,7 @@ class CircularBuffer<T> {
      * Behaves like `CircularBuffer.set()`, but sets the value to the zero
      * element, which represents an uninhabited spot for a `CircularBuffer`.
      */
-    delete(i: number): T | null | number {
+    public delete(i: number): T | null | number {
         const zeroElement = this.isArray ? null : 0;
         return this.set(i, zeroElement);
     }
@@ -439,7 +448,7 @@ class CircularBuffer<T> {
      * zero element, which represents an uninhabited spot for a
      * `CircularBuffer`.
      */
-    bufferDelete(i: number): T | null | number {
+    public bufferDelete(i: number): T | null | number {
         const zeroElement = this.isArray ? null : 0;
         return this.bufferSet(i, zeroElement);
     }
@@ -451,7 +460,7 @@ class CircularBuffer<T> {
      * This is equivalent to `delete`ing all elements, and setting
      * `head = tail = 0`.
      */
-    clear(): void {
+    public clear(): void {
         const zeroElement = this.isArray ? null : 0;
         for (let i = 0; i < this.capacity; ++i) {
             this._buffer[i] = zeroElement;
@@ -468,7 +477,7 @@ class CircularBuffer<T> {
      * The kind of array that is returned is the same as the kind of the
      * underlying buffer (`this.isArray?`).
      */
-    getTail(): (T | null)[] | TypedArray {
+    public getTail(): (T | null)[] | TypedArray {
         const tailSize =
             this.tail < this.head ?
                 this.head - this.tail - 1 :
@@ -476,6 +485,7 @@ class CircularBuffer<T> {
         const arr =
             this.isArray ?
                 [] :
+                // tslint:disable-next-line:no-any
                 new (this._buffer.constructor as any)(tailSize);
         let i = this.tail;
         let j = 0;
@@ -493,7 +503,7 @@ class CircularBuffer<T> {
      * The kind of array that is returned is the same as the kind of the
      * underlying buffer (`this.isArray?`).
      */
-    getInit(): (T | null)[] | TypedArray {
+    public getInit(): (T | null)[] | TypedArray {
         const initSize =
             this.tail < this.head ?
                 this.head - this.tail - 1 :
@@ -501,6 +511,7 @@ class CircularBuffer<T> {
         const arr =
             this.isArray ?
                 [] :
+                // tslint:disable-next-line:no-any
                 new (this._buffer.constructor as any)(initSize);
         let i = this.head - 1;
         let j = initSize - 1;
@@ -514,7 +525,7 @@ class CircularBuffer<T> {
     /**
      * Gets a shallow copy of the contents of the buffer, as an `Array`.
      */
-    asArray(): (T | null | number)[] {
+    public asArray(): (T | null | number)[] {
         const arr = [];
         for (let i = 0; i < this.capacity; ++i) {
             arr.push(this._buffer[i]);
@@ -532,7 +543,9 @@ class CircularBuffer<T> {
      *
      * Any elements that are not of type `number` are coerced to `0`.
      */
-    asTypedArray(type: TypedArrayConstructor = Float64Array): TypedArray {
+    public asTypedArray(
+        type: TypedArrayConstructor = Float64Array
+    ): TypedArray {
         if (this._buffer instanceof Array) {
             const typedArr = new type(this.capacity);
             for (let i = 0; i < this.capacity; ++i) {
@@ -552,9 +565,10 @@ class CircularBuffer<T> {
      * Executes the provided function for each element from the tail to the
      * head.
      */
-    forEachTail(f: (val: T | null) => any): void;
-    forEachTail(f: (val: number)   => any): void;
-    forEachTail(f: (val: any)      => any): void {
+    public forEachTail(f: (val: T | null) => void): void;
+    public forEachTail(f: (val: number)   => void): void;
+    // tslint:disable-next-line:no-any
+    public forEachTail(f: (val: any)      => void): void {
         const zeroElement = this.isArray ? null : 0;
         if (this.head === this.tail && this.peek() === zeroElement) {
             return;
@@ -572,7 +586,7 @@ class CircularBuffer<T> {
      * Executes the provided function for each element from the head to the
      * tail.
      */
-    forEachHead(f: (val: T | null | number) => any): void {
+    public forEachHead(f: (val: T | null | number) => void): void {
         let i = this.head - 1;
         for (; i !== this.tail; i = i === 0 ? this.capacity - 1 : i - 1) {
             f(this._buffer[i]);
@@ -583,9 +597,10 @@ class CircularBuffer<T> {
      * Executes the provided function for each element from the beginning to
      * the end of the underlying buffer.
      */
-    forEachBuffer(f: (val: T | null) => any): void;
-    forEachBuffer(f: (val: number)   => any): void;
-    forEachBuffer(f: (val: any)      => any): void {
+    public forEachBuffer(f: (val: T | null) => void): void;
+    public forEachBuffer(f: (val: number)   => void): void;
+    // tslint:disable-next-line:no-any
+    public forEachBuffer(f: (val: any)      => void): void {
         for (let i = 0; i < this._buffer.length; ++i) {
             f(this._buffer[i]);
         }
@@ -604,15 +619,16 @@ class CircularBuffer<T> {
      * This method maps elements in the order they exist in the underlying
      * buffer, so don't rely on the oder respecting `head` and `tail`.
      */
-    map(
+    public map(
         f: (val: T | null) => T | null,
         mapZeroes?: boolean
     ): CircularBuffer<T>;
-    map(
+    public map(
         f: (val: number)   => number,
         mapZeroes?: boolean
     ): CircularBuffer<T>;
-    map(
+    public map(
+        // tslint:disable-next-line:no-any
         f: (val: any)      => T | null | number,
         mapZeroes:  boolean = false
     ): CircularBuffer<T> {
@@ -677,24 +693,24 @@ class CircularBuffer<T> {
 
 
 class V2 {
-    constructor(public x: number, public y: number) {}
+    public constructor(public x: number, public y: number) {}
 
     /**
      * Error tolerance when checking for equality concerning vectors.
      */
-    static epsilon: number = 1e-12;
+    public static epsilon: number = 1e-12;
 
     /**
      * Makes a `V2` out of the first two elements of an `Array`.
      */
-    static fromArray(array: number[] | TypedArray): V2 {
+    public static fromArray(array: number[] | TypedArray): V2 {
         return new V2(array[0], array[1]);
     }
 
     /**
      * Returns the zero vector.
      */
-    static zero(): V2 {
+    public static zero(): V2 {
         return new V2(0, 0);
     }
 
@@ -704,14 +720,14 @@ class V2 {
      *
      * `theta` is in radians.
      */
-    static fromAngle(theta: number): V2 {
+    public static fromAngle(theta: number): V2 {
         return new V2(Math.cos(theta), Math.sin(theta));
     }
 
     /**
      * Returns a new `V2` with the given number as both of its entries.
      */
-    static pure(n: number): V2 {
+    public static pure(n: number): V2 {
         return new V2(n, n);
     }
 
@@ -719,14 +735,14 @@ class V2 {
      * Creates a `string` representation of this `V2` and returns it, in the
      * form "V2(`x`, `y`)".
      */
-    toString(): string {
+    public toString(): string {
         return `V2(${this.x}, ${this.y})`;
     }
 
     /**
      * Returns a clone of this vector.
      */
-    clone(): V2 {
+    public clone(): V2 {
         return new V2(this.x, this.y);
     }
 
@@ -734,7 +750,7 @@ class V2 {
      * Returns an `Array` representation of this vector; an `Array` of
      * length exactly 2.
      */
-    array(): number[] {
+    public array(): number[] {
         return [this.x, this.y];
     }
 
@@ -742,7 +758,7 @@ class V2 {
      * Compares two vectors to see if they are the same, within an error of
      * `V2.epsilon`.
      */
-    equals(v: V2): boolean {
+    public equals(v: V2): boolean {
         return Math.abs(this.x - v.x) < V2.epsilon &&
                Math.abs(this.y - v.y) < V2.epsilon;
     }
@@ -750,14 +766,14 @@ class V2 {
     /**
      * Is this the null vector?
      */
-    null(): boolean {
+    public null(): boolean {
         return Math.abs(this.x) < V2.epsilon && Math.abs(this.y) < V2.epsilon;
     }
 
     /**
      * Adds two 2-vectors.
      */
-    add(v: V2): V2 {
+    public add(v: V2): V2 {
         return new V2(this.x + v.x, this.y + v.y);
     }
 
@@ -765,7 +781,7 @@ class V2 {
      * Subtracts the supplied vector from this vector, returning the new
      * resulting `V2`.
      */
-    sub(v: V2): V2 {
+    public sub(v: V2): V2 {
         return new V2(this.x - v.x, this.y - v.y);
     }
 
@@ -773,7 +789,7 @@ class V2 {
      * Multiplies the supplied scalar by this vector, returning a new `V2` as
      * the result.
      */
-    scalarMult(k: number): V2 {
+    public scalarMult(k: number): V2 {
         return new V2(k * this.x, k * this.y);
     }
 
@@ -781,7 +797,7 @@ class V2 {
      * Divides this vector by the supplied scalar, returning a new `V2` as the
      * result.
      */
-    scalarDiv(k: number): V2 {
+    public scalarDiv(k: number): V2 {
         return new V2(this.x / k, this.y / k);
     }
 
@@ -789,21 +805,21 @@ class V2 {
      * Dots this vector by the supplied vector, returning a new `V2` as the
      * result.
      */
-    dot(v: V2): number {
+    public dot(v: V2): number {
         return this.x * v.x + this.y * v.y;
     }
 
     /**
      * The euclidian norm.
      */
-    norm(): number {
+    public norm(): number {
         return Math.sqrt(this.x * this.x + this.y * this.y);
     }
 
     /**
      * The quadrance.
      */
-    quadrance(): number {
+    public quadrance(): number {
         return this.x * this.x + this.y * this.y;
     }
 
@@ -811,7 +827,7 @@ class V2 {
      * Returns a new `V2` representing the closest perpendicular vector (with
      * the same norm) to this one, going anticlockwise.
      */
-    perp(): V2 {
+    public perp(): V2 {
         return new V2(-this.y, this.x);
     }
 
@@ -819,14 +835,14 @@ class V2 {
      * The z-component of the cross product of this vector with the supplied
      * vector in the xy-plane.
      */
-    crossZ(v: V2): number {
+    public crossZ(v: V2): number {
         return this.x * v.y - this.y * v.x;
     }
 
     /**
      * The distance between vectors in metric space.
      */
-    dist(v: V2): number {
+    public dist(v: V2): number {
         return this.sub(v).norm();
     }
 
@@ -834,7 +850,7 @@ class V2 {
      * Gets the unit vector that is pointing in the same direction as this one.
      * Acts like `.clone()` for null vectors and unit vectors.
      */
-    normalize(): V2 {
+    public normalize(): V2 {
         const quad = this.quadrance();
         if (Math.abs(quad) <= V2.epsilon || Math.abs(quad - 1) <= V2.epsilon) {
             return this.clone();
@@ -846,7 +862,7 @@ class V2 {
     /**
      * Gets the projection of a vector onto this one.
      */
-    project(v: V2): V2 {
+    public project(v: V2): V2 {
         return this.scalarMult(this.dot(v) / this.quadrance());
     }
 
@@ -855,14 +871,14 @@ class V2 {
      *
      * Result is in radians and is always between `-pi` and `pi`.
      */
-    angle(): number {
+    public angle(): number {
         return Math.acos(this.x / this.norm()) * Math.sign(this.y);
     }
 
     /**
      * Maps a function over both elements of this vector, returning a new `V2`.
      */
-    map(f: (component: number) => number): V2 {
+    public map(f: (component: number) => number): V2 {
         return new V2(f(this.x), f(this.y));
     }
 }
@@ -879,11 +895,11 @@ function v2(x: number, y: number): V2 {
 
 
 class Rect {
-    x: number;
-    y: number;
+    public x: number;
+    public y: number;
 
-    width: number;
-    height: number;
+    public width: number;
+    public height: number;
 
     /**
      * Creates a new `Rect` with the specified top-left corner, width, and
@@ -894,7 +910,7 @@ class Rect {
      * - Two arguments, both `V2`s.
      * - One argument, a single `Rect` to be cloned.
      */
-    constructor(
+    public constructor(
         arg1:  number | V2 | Rect,
         arg2?: number | V2,
         arg3?: number,
@@ -927,7 +943,7 @@ class Rect {
      * Returns a `string` representation of this `Rect`, in the form
      * "Rect(`x`, `y`, `width`, `height`)".
      */
-    toString(): string {
+    public toString(): string {
         return `Rect(${this.x}, ${this.y}, ${this.width}, ${this.height})`;
     }
 
@@ -937,7 +953,7 @@ class Rect {
      * The point can be specified as two separate `number`s or just a single
      * `V2`.
      */
-    contains(arg1: number | V2, arg2?: number): boolean {
+    public contains(arg1: number | V2, arg2?: number): boolean {
         if (typeof arg1 === "number" && arg2 !== undefined) {
             return arg1 >= this.x &&
                    arg2 >= this.y &&
@@ -1003,10 +1019,12 @@ function squareAtAngle(c: V2, s: number, theta: number): V2 {
         const y = c.y + s * Math.tan(Math.PI - theta) / 2;
         return v2(x, y);
     }
-    // Bottom
-    const x = c.x - s * Math.tan(3 * Math.PI / 2 - theta) / 2;
-    const y = c.y - s / 2;
-    return v2(x, y);
+    { // Block here so that `x` and `y` aren't shadowed
+        // Bottom
+        const x = c.x - s * Math.tan(3 * Math.PI / 2 - theta) / 2;
+        const y = c.y - s / 2;
+        return v2(x, y);
+    }
 }
 
 
@@ -1033,9 +1051,9 @@ function isBigEndian(): boolean {
  * endian).
  */
 class Data {
-    isBigEndian: boolean;
+    public isBigEndian: boolean;
 
-    constructor() {
+    public constructor() {
         this.isBigEndian = isBigEndian();
     }
 
@@ -1043,7 +1061,7 @@ class Data {
      * Takes in an `ArrayBuffer` and returns a `string` that is the result of
      * interpreting the `ArrayBuffer`'s data as ASCII encoded text.
      */
-    bufferToAscii(buffer: ArrayBuffer): string {
+    public bufferToAscii(buffer: ArrayBuffer): string {
         return this.u8ArrayToAscii(new Uint8Array(buffer));
     }
 
@@ -1051,7 +1069,8 @@ class Data {
      * Like `bufferToAscii()`, but takes in a `Uint8Array` for use when the
      * view already exists.
      */
-    u8ArrayToAscii(u8Arr: Uint8Array): string {
+    // tslint:disable-next-line:prefer-function-over-method
+    public u8ArrayToAscii(u8Arr: Uint8Array): string {
         let s = "";
         for (let i = 0; i < u8Arr.length; ++i) {
             s += String.fromCharCode(u8Arr[i]);
@@ -1062,7 +1081,8 @@ class Data {
     /**
      * Turns a 32-bit integer into an array (`Uint8Array`) of bytes.
      */
-    i32ToBytes(n: number): Uint8Array {
+    // tslint:disable-next-line:prefer-function-over-method
+    public i32ToBytes(n: number): Uint8Array {
         const bytes = new Uint8Array(4);
         for (let i = 0; i < 4; ++i) {
             bytes[i] = n & 0xFF;
@@ -1075,7 +1095,7 @@ class Data {
      * Turns a 64-bit floating point number into an array (`Uint8Array`) of
      * bytes.
      */
-    f64ToBytes(n: number): Uint8Array {
+    public f64ToBytes(n: number): Uint8Array {
         const buf = new ArrayBuffer(8);
         const arr = new Float64Array(buf);
         arr[0] = n;
@@ -1089,7 +1109,8 @@ class Data {
      * Turns a hexadecimal `string` representation of an RGB color (e.g.
      * `#e5b90a`) into a byte array.
      */
-    hexRgbToBytes(color: string): Uint8Array {
+    // tslint:disable-next-line:prefer-function-over-method
+    public hexRgbToBytes(color: string): Uint8Array {
         const arr = new Uint8Array(3);
         arr[0] = parseInt(color.slice(1, 3), 16);
         arr[1] = parseInt(color.slice(3, 5), 16);
@@ -1106,13 +1127,17 @@ class Data {
  * Handles deregistering of event listeners.
  */
 class EventRegistrar {
-    events: Map<string, [EventTarget, EventListener][]>;
+    public events: Map<string, [EventTarget, EventListener][]>;
 
-    constructor() {
+    public constructor() {
         this.events = new Map();
     }
 
-    register(target: EventTarget, type: string, fn: EventListener): void {
+    public register(
+        target: EventTarget,
+        type: string,
+        fn: EventListener
+    ): void {
         const registeredType = this.events.get(type);
         if (registeredType !== undefined) {
             this.events.set(type, registeredType.concat([[target, fn]]));
@@ -1121,8 +1146,8 @@ class EventRegistrar {
         }
     }
 
-    forEach(
-        f: (target: EventTarget, type: string, fn: EventListener) => any
+    public forEach(
+        f: (target: EventTarget, type: string, fn: EventListener) => void
     ): void {
         this.events.forEach(
             (pairs, type) => pairs.forEach(

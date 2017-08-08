@@ -6,45 +6,50 @@ class LoopIndexer {
 }
 
 class Main {
-    static doLoop: boolean = true;
-    static currentLoops: Map<string, V2> = new Map([["mainMenu", V2.zero()]]);
-    static wsRecvCallback: ((data: MessageEvent) => any) | null = null;
-    static lastLoop: number = 0;
+    public static doLoop: boolean = true;
+    public static currentLoops: Map<string, V2> =
+        new Map([["mainMenu", V2.zero()]]);
+    public static wsRecvCallback: ((data: MessageEvent) => void) | null = null;
+    public static lastLoop: number = 0;
 
-    static currGame: string;
-    static serverToJoinName: string;
-    static username: string;
+    public static currGame: string;
+    public static serverToJoinName: string;
+    public static username: string;
 
-    static uuid: any;
+    // tslint:disable-next-line:no-any
+    public static uuid: any;
 
-    static readonly data: Data = new Data();
+    public static readonly data: Data = new Data();
 
-    static readonly width:  number = 1280;
-    static readonly height: number = 720;
-    static readonly canvasRect: Rect = rect(0, 0, 1280, 720);
+    public static readonly width:  number = 1280;
+    public static readonly height: number = 720;
+    public static readonly canvasRect: Rect = rect(0, 0, 1280, 720);
 
-    static readonly maxPlayerCount: number = 2;
+    public static readonly maxPlayerCount: number = 2;
 
-    static readonly clickAnimDur: number = 250; // milliseconds
-    static readonly crosshairQuad: [V2, V2, V2, V2] = [ v2(15,  0)
-                                                      , v2(-15, 0)
-                                                      , v2(0,  15)
-                                                      , v2(0, -15)
-                                                      ];
-    static readonly sparkGravity: number = 0.005;
+    public static readonly clickAnimDur: number = 250; // milliseconds
+    public static readonly crosshairQuad: [V2, V2, V2, V2] = [ v2(15,  0)
+                                                             , v2(-15, 0)
+                                                             , v2(0,  15)
+                                                             , v2(0, -15)
+                                                             ];
+    public static readonly sparkGravity: number = 0.005;
 
-    static readonly transitionTime: number = 697.2; // milliseconds
+    public static readonly transitionTime: number = 697.2; // milliseconds
 
-    static readonly maxProjVel:    number = 2.5;
-    static readonly maxProjAngVel: number = 0.02;
+    public static readonly maxProjVel:    number = 2.5;
+    public static readonly maxProjAngVel: number = 0.02;
 
-    static loops: LoopIndexer = new LoopIndexer();
+    public static loops: LoopIndexer = new LoopIndexer();
 
-    static isInCanvas(arg1: number | V2, arg2?: number): boolean {
+    public static isInCanvas(arg1: number | V2, arg2?: number): boolean {
         return Main.canvasRect.contains(arg1, arg2);
     }
 
-    static noSupportFailure(htmlName: string, plainName: string): never {
+    public static noSupportFailure(
+        htmlName: string,
+        plainName: string
+    ): never {
         const fallback =
             "<p>Uh oh! It looks like your browser doesn't support " +
                 `<code>${htmlName}</code>. ` +
@@ -62,12 +67,12 @@ class Main {
         throw new Error(noSupportMsg);
     }
 
-    static init: () => void;
+    public static init: () => void;
 
-    static getTransition: ( thisName:       string
-                          , destName:       string
-                          , dir:            Direction
-                          , eventListeners: EventRegistrar
+    public static getTransition: ( thisName:       string
+                          ,        destName:       string
+                          ,        dir:            Direction
+                          ,        eventListeners: EventRegistrar
                           ) => (t?: number) => void;
 }
 
@@ -90,7 +95,7 @@ Main.init = () => {
     const ws = new WebSocket("ws://50.53.124.21:3000/ws");
     ws.binaryType = "arraybuffer";
     const hello = new Uint8Array(
-        [0x05, 0x58, 0xe6, 0x39, 0x0a, 0xc4, 0x13, 0x24]
+        [0x05, 0x58, 0xE6, 0x39, 0x0A, 0xC4, 0x13, 0x24]
     ).buffer;
 
     window.addEventListener(

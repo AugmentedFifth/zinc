@@ -3,7 +3,7 @@ abstract class AbstractMouseState {
 
     public clickAnim: [V2, number] | null = null;
 
-    constructor(
+    public constructor(
         canvas:         HTMLCanvasElement,
         eventListeners: EventRegistrar,
         buttons:        Button[]
@@ -34,7 +34,7 @@ abstract class AbstractMouseState {
         eventListeners.register(canvas, "click", _click);
     }
 
-    drawClickEffect(ctx: CanvasRenderingContext2D, dt: number): void {
+    public drawClickEffect(ctx: CanvasRenderingContext2D, dt: number): void {
         if (this.clickAnim !== null) {
             ctx.save();
 
@@ -76,7 +76,7 @@ class MouseState extends AbstractMouseState {
 
     public lastSparkPos: V2 = V2.zero();
 
-    constructor(
+    public constructor(
         canvas:         HTMLCanvasElement,
         eventListeners: EventRegistrar,
         buttons:        Button[]
@@ -100,7 +100,7 @@ class MouseState extends AbstractMouseState {
         eventListeners.register(canvas, "mouseenter", _mouseenter);
     }
 
-    drawMouseTrail(ctx: CanvasRenderingContext2D): void {
+    public drawMouseTrail(ctx: CanvasRenderingContext2D): void {
         ctx.save();
 
         ctx.lineWidth = 2;
@@ -153,7 +153,10 @@ class MouseState extends AbstractMouseState {
         ctx.restore();
     }
 
-    drawAndUpdateMouseSparks(ctx: CanvasRenderingContext2D, dt: number): void {
+    public drawAndUpdateMouseSparks(
+        ctx: CanvasRenderingContext2D,
+        dt: number
+    ): void {
         ctx.save();
 
         ctx.globalCompositeOperation = "lighter";
@@ -185,7 +188,7 @@ class MouseState extends AbstractMouseState {
 }
 
 class MouseStateNoTrail extends AbstractMouseState {
-    constructor(
+    public constructor(
         canvas:         HTMLCanvasElement,
         eventListeners: EventRegistrar,
         buttons:        Button[]

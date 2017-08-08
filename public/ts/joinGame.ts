@@ -53,7 +53,8 @@ Main.loops.joinGame = (canvas, ctx, ws) => {
         [ [rect(240, 230, 800, 45), "", false, 24]
         ];
 
-    let gameName: string, username: string;
+    let gameName: string;
+    let username: string;
     let alertText: string[] = [];
 
     const wrongLength: (fb: FormBox) => boolean =
@@ -95,7 +96,7 @@ Main.loops.joinGame = (canvas, ctx, ws) => {
             joinGameCallback();
         }
     };
-    function joinCallback() {
+    function joinCallback(): void {
         if (formBoxes.some(wrongLength)) {
             alertText =
                 [ "Make sure that your username is at least 2 characters"
@@ -103,8 +104,8 @@ Main.loops.joinGame = (canvas, ctx, ws) => {
                 ];
             return;
         }
-        for (const [ , text] of formBoxes) {
-            for (const char of text) {
+        for (const [ , formText] of formBoxes) {
+            for (const char of formText) {
                 if (illegalChar(char)) {
                     alertText = [`Illegal character: ${char}`];
                     return;
@@ -173,7 +174,7 @@ Main.loops.joinGame = (canvas, ctx, ws) => {
     const mouseState = new MouseState(canvas, eventListeners, buttons);
 
     // New game page main loop.
-    function newGame(displacement: V2, dt: number) {
+    function newGame(displacement: V2, dt: number): void {
         // Fill in the background.
         ctx.save();
         ctx.fillStyle = darkBgPattern;

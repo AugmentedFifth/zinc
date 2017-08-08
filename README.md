@@ -3,7 +3,8 @@
 ```bash
 $ git clone https://github.com/AugmentedFifth/zinc.git
 $ cd zinc
-$ stack build
+$ mkdir public/js
+$ make all  # or, make release
 $ stack exec zinc
 $ firefox --new-tab localhost:3000
 ```

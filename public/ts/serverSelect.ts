@@ -103,7 +103,7 @@ Main.loops.serverSelect = (canvas, ctx, ws) => {
         }
         serverList = newServerList;
     };
-    function requestServerList() {
+    function requestServerList(): void {
         if (doRequestServerList) {
             Main.wsRecvCallback = recvServerListCallback;
             ws.send(requestServerListPacket);
@@ -194,7 +194,7 @@ Main.loops.serverSelect = (canvas, ctx, ws) => {
     eventListeners.register(canvas, "click", _clickServerName);
 
     // Server select menu main loop.
-    function serverSelect(displacement: V2, dt: number) {
+    function serverSelect(displacement: V2, dt: number): void {
         // Fill in the background.
         ctx.save();
         ctx.fillStyle = darkBgPattern;

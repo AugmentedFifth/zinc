@@ -6,11 +6,11 @@ class Projectile {
     public dust: [V2, V2][] = [];
     private dustLifetime: number = 0;
 
-    static readonly dustRadius: number = 4;
+    public static readonly dustRadius: number = 4;
 
     private static readonly dustLifespan: number = 1000;
 
-    constructor(
+    public constructor(
         public readonly id:     number,
         public          pos:    V2,
         public          vel:    V2,
@@ -19,7 +19,7 @@ class Projectile {
         public readonly radius: number
     ) {}
 
-    update(dt: number): void {
+    public update(dt: number): void {
         if (this.isBroken) {
             if (!this.hasBroken) {
                 this.dust = [];
@@ -59,11 +59,11 @@ class Projectile {
         }
     }
 
-    addPos(d: V2): void {
+    public addPos(d: V2): void {
         this.pos = this.pos.add(d);
     }
 
-    clone(): Projectile {
+    public clone(): Projectile {
         const clone = new Projectile(
             this.id,
             this.pos,
