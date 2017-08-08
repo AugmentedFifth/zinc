@@ -1,33 +1,47 @@
-Main.newGame = (canvas, ctx, ws) => {
-    "use strict";
-
+Main.loops.joinGame = (canvas, ctx, ws) => {
     // Holding a local copy of event listeners so they can be unloaded.
     const eventListeners = new EventRegistrar();
 
     // Initialize patterns.
-    const darkBg = document.getElementById("45-deg-dark-jean-pattern");
-    const darkBgPattern = ctx.createPattern(darkBg, "repeat");
+    const darkBgPattern = ctx.createPattern(
+        document.getElementById(
+            "45-deg-dark-jean-pattern"
+        ) as HTMLImageElement,
+        "repeat"
+    );
 
-    const textBg = document.getElementById("pink-dust-pattern");
-    const textBgPattern = ctx.createPattern(textBg, "repeat");
+    const textBgPattern = ctx.createPattern(
+        document.getElementById(
+            "pink-dust-pattern"
+        ) as HTMLImageElement,
+        "repeat"
+    );
 
-    const buttonBg = document.getElementById("grey-linen-pattern");
-    const buttonBgPattern = ctx.createPattern(buttonBg, "repeat");
+    const buttonBgPattern = ctx.createPattern(
+        document.getElementById(
+            "grey-linen-pattern"
+        ) as HTMLImageElement,
+        "repeat"
+    );
 
-    const naturalBlack = document.getElementById("natural-black-pattern");
-    const naturalBlackPattern = ctx.createPattern(naturalBlack, "repeat");
+    const naturalBlackPattern = ctx.createPattern(
+        document.getElementById(
+            "natural-black-pattern"
+        ) as HTMLImageElement,
+        "repeat"
+    );
 
     // Generating button data.
     const backCallback = Main.getTransition(
-        "newGame",
+        "joinGame",
         "serverSelect",
         1,
         eventListeners
     );
 
-    const buttons =
-        [ [rect(150, 550, 325, 100), 7, "start", startCallback]
-        , [rect(805, 550, 325, 100), 7, "back",  backCallback]
+    const buttons: Button[] =
+        [ [rect(150, 550, 325, 100), 7, "join", joinCallback]
+        , [rect(805, 550, 325, 100), 7, "back", backCallback]
         ];
 
     const screwAngles =
@@ -35,21 +49,18 @@ Main.newGame = (canvas, ctx, ws) => {
             .map(() => Math.PI * Math.random());
 
     // Form boxes to be typed into.
-    const formBoxes = Main.username ?
-        [ [rect(240, 380, 800, 45), "", false, 32]
-        ] :
+    const formBoxes: FormBox[] =
         [ [rect(240, 230, 800, 45), "", false, 24]
-        , [rect(240, 380, 800, 45), "", false, 32]
         ];
 
-    let gameName, username;
-    let alertText = [];
+    let gameName: string, username: string;
+    let alertText: string[] = [];
 
-    const wrongLength =
+    const wrongLength: (fb: FormBox) => boolean =
         ([ , text, , maxLen]) => text.length < 2 || text.length > maxLen;
     const illegalChar =
-        char => char.charCodeAt() < 32 || char.charCodeAt() > 126;
-    const newGameConfirmCallback = data => {
+        (char: string) => char.charCodeAt(0) < 32 || char.charCodeAt(0) > 126;
+    const joinGameConfirmCallback = (data: MessageEvent) => {
         const bytes = new Uint8Array(data.data);
         if (bytes[0] !== 0x01) {
             console.log(
@@ -59,7 +70,7 @@ Main.newGame = (canvas, ctx, ws) => {
         }
         if (bytes[1] === 1) {
             alertText =
-                [ "An error has occured in creating your new game."
+                [ "An error has occured in joining the game."
                 , "Please try again later."
                 ];
         } else if (bytes[1] === 2) {
@@ -69,27 +80,26 @@ Main.newGame = (canvas, ctx, ws) => {
                 ];
         } else if (bytes[1] === 3) {
             alertText =
-                [ "It looks like there's already a game called that."
-                , "Change your game's name and try again."
+                [ "It looks like there's no such game with that name."
+                , "Please try again later."
                 ];
         } else {
-            const startGameCallback = Main.getTransition(
-                "newGame",
+            const joinGameCallback = Main.getTransition(
+                "joinGame",
                 "game",
                 2,
                 eventListeners
             );
             Main.username = username;
             Main.currGame = gameName;
-            startGameCallback();
+            joinGameCallback();
         }
     };
-    function startCallback() {
+    function joinCallback() {
         if (formBoxes.some(wrongLength)) {
             alertText =
-                [ "Make sure that both names are at least 2 characters"
-                , "long and that your name and the game name do not"
-                , "exceed 24 and 32 characters, respectively."
+                [ "Make sure that your username is at least 2 characters"
+                , "long and does not exceed 24 characters."
                 ];
             return;
         }
@@ -102,43 +112,27 @@ Main.newGame = (canvas, ctx, ws) => {
             }
         }
 
-        const createNewGameBytes = [0x01];
-        if (Main.username) {
-            createNewGameBytes.push(Main.username.length);
-            for (let j = 0; j < Main.username.length; ++j) {
-                createNewGameBytes.push(Main.username.charCodeAt(j));
-            }
-
-            const text = formBoxes[0][1];
-            createNewGameBytes.push(text.length);
-            for (let j = 0; j < text.length; ++j) {
-                createNewGameBytes.push(text.charCodeAt(j));
-            }
-            username = Main.username;
-            gameName = text;
-        } else {
-            for (let i = 0; i < formBoxes.length; ++i) {
-                const text = formBoxes[i][1];
-                createNewGameBytes.push(text.length);
-                for (let j = 0; j < text.length; ++j) {
-                    createNewGameBytes.push(text.charCodeAt(j));
-                }
-                if (i === 0) {
-                    username = text;
-                } else {
-                    gameName = text;
-                }
-            }
+        const joinGameBytes = [0x05];
+        const text = formBoxes[0][1];
+        joinGameBytes.push(text.length);
+        for (let i = 0; i < text.length; ++i) {
+            joinGameBytes.push(text.charCodeAt(i));
         }
+        joinGameBytes.push(Main.serverToJoinName.length);
+        for (let i = 0; i < Main.serverToJoinName.length; ++i) {
+            joinGameBytes.push(Main.serverToJoinName.charCodeAt(i));
+        }
+        username = text;
+        gameName = Main.serverToJoinName;
 
-        Main.wsRecvCallback = newGameConfirmCallback;
-        ws.send(new Uint8Array(createNewGameBytes).buffer);
+        Main.wsRecvCallback = joinGameConfirmCallback;
+        ws.send(new Uint8Array(joinGameBytes).buffer);
     }
 
     const formCursorPeriod = 1792;
     let formCursorTime = 0;
 
-    const _formClick = e => {
+    const _formClick = (e: MouseEvent) => {
         const boundingRect = canvas.getBoundingClientRect();
         const clickPos = v2(
             e.clientX - boundingRect.left,
@@ -157,7 +151,7 @@ Main.newGame = (canvas, ctx, ws) => {
     canvas.addEventListener("click", _formClick);
     eventListeners.register(canvas, "click", _formClick);
 
-    const _formKeydown = e => {
+    const _formKeydown = (e: KeyboardEvent) => {
         const keydownedFormIx = formBoxes.findIndex(fb => fb[2]);
         if (~keydownedFormIx) {
             if (e.key === "Backspace" || e.key === "Delete") {
@@ -176,10 +170,10 @@ Main.newGame = (canvas, ctx, ws) => {
     eventListeners.register(window, "keydown", _formKeydown);
 
     // Resistering mouse state.
-    const mouseState = registerMouse(canvas, eventListeners, buttons);
+    const mouseState = new MouseState(canvas, eventListeners, buttons);
 
     // New game page main loop.
-    function newGame(displacement, dt) {
+    function newGame(displacement: V2, dt: number) {
         // Fill in the background.
         ctx.save();
         ctx.fillStyle = darkBgPattern;
@@ -231,12 +225,12 @@ Main.newGame = (canvas, ctx, ws) => {
         ctx.font = "36px 'Noto Sans', sans-serif";
         ctx.textAlign = "center";
         ctx.fillStyle = "#777";
-        if (Main.username) {
-            ctx.fillText(`your name: ${Main.username}`, Main.width / 2, 210);
-        } else {
-            ctx.fillText("your name", Main.width / 2, 210);
-        }
-        ctx.fillText("game name", Main.width / 2, 360);
+        ctx.fillText("your name", Main.width / 2, 210);
+        ctx.fillText(
+            `game name: ${Main.serverToJoinName}`,
+            Main.width / 2,
+            360
+        );
         ctx.restore();
 
         // Draw alert text.
@@ -262,13 +256,13 @@ Main.newGame = (canvas, ctx, ws) => {
         );
 
         // Draw mouse trail.
-        drawMouseTrail(ctx, mouseState);
+        mouseState.drawMouseTrail(ctx);
 
         // Draw mouse movement particle effects.
-        drawAndUpdateMouseSparks(ctx, mouseState, dt);
+        mouseState.drawAndUpdateMouseSparks(ctx, dt);
 
         // Draw mouse click effect.
-        drawClickEffect(ctx, mouseState, dt);
+        mouseState.drawClickEffect(ctx, dt);
     }
 
     return newGame;

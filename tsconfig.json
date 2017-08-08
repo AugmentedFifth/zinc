@@ -1,0 +1,20 @@
+{
+    "compilerOptions": {
+        "lib": [
+            "esnext",
+            "dom",
+            "dom.iterable",
+            "scripthost",
+            "webworker"
+        ],
+        "module": "esnext",
+        "newLine": "LF",
+        "noEmitOnError": true,
+        "noFallthroughCasesInSwitch": true,
+        "noImplicitReturns": true,
+        "noUnusedLocals": true,
+        "pretty": true,
+        "strict": true,
+        "target": "esnext"
+    }
+}

@@ -1,18 +1,28 @@
-Main.aboutPage = (canvas, ctx) => {
-    "use strict";
-
+Main.loops.aboutPage = (canvas, ctx) => {
     // Holding a local copy of event listeners so they can be unloaded.
     const eventListeners = new EventRegistrar();
 
     // Initialize patterns.
-    const darkBg = document.getElementById("45-deg-dark-jean-pattern");
-    const darkBgPattern = ctx.createPattern(darkBg, "repeat");
+    const darkBgPattern = ctx.createPattern(
+        document.getElementById(
+            "45-deg-dark-jean-pattern"
+        ) as HTMLImageElement,
+        "repeat"
+    );
 
-    const textBg = document.getElementById("pink-dust-pattern");
-    const textBgPattern = ctx.createPattern(textBg, "repeat");
+    const textBgPattern = ctx.createPattern(
+        document.getElementById(
+            "pink-dust-pattern"
+        ) as HTMLImageElement,
+        "repeat"
+    );
 
-    const buttonBg = document.getElementById("grey-linen-pattern");
-    const buttonBgPattern = ctx.createPattern(buttonBg, "repeat");
+    const buttonBgPattern = ctx.createPattern(
+        document.getElementById(
+            "grey-linen-pattern"
+        ) as HTMLImageElement,
+        "repeat"
+    );
 
     // Generating button data.
     const mainCallback = Main.getTransition(
@@ -29,7 +39,7 @@ Main.aboutPage = (canvas, ctx) => {
         newTab.focus();
     };
 
-    const buttons =
+    const buttons: Button[] =
         [ [rect(150, 550, 325, 100), 7, "main",   mainCallback]
         , [rect(805, 550, 325, 100), 7, "source", sourceCallback]
         ];
@@ -39,7 +49,7 @@ Main.aboutPage = (canvas, ctx) => {
             .map(() => Math.PI * Math.random());
 
     // Resistering mouse state.
-    const mouseState = registerMouse(canvas, eventListeners, buttons);
+    const mouseState = new MouseState(canvas, eventListeners, buttons);
 
     // Content text for this page.
     const contentText =
@@ -52,7 +62,7 @@ Main.aboutPage = (canvas, ctx) => {
         ];
 
     // About page main loop.
-    function aboutPage(displacement, dt) {
+    function aboutPage(displacement: V2, dt: number) {
         // Fill in the background.
         ctx.save();
         ctx.fillStyle = darkBgPattern;
@@ -91,13 +101,13 @@ Main.aboutPage = (canvas, ctx) => {
         );
 
         // Draw mouse trail.
-        drawMouseTrail(ctx, mouseState);
+        mouseState.drawMouseTrail(ctx);
 
         // Draw mouse movement particle effects.
-        drawAndUpdateMouseSparks(ctx, mouseState, dt);
+        mouseState.drawAndUpdateMouseSparks(ctx, dt);
 
         // Draw mouse click effect.
-        drawClickEffect(ctx, mouseState, dt);
+        mouseState.drawClickEffect(ctx, dt);
     }
 
     return aboutPage;

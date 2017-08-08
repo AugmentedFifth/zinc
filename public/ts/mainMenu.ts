@@ -1,18 +1,28 @@
-Main.mainMenu = (canvas, ctx) => {
-    "use strict";
-
+Main.loops.mainMenu = (canvas, ctx) => {
     // Holding a local copy of event listeners so they can be unloaded.
     const eventListeners = new EventRegistrar();
 
     // Initialize patterns.
-    const darkBg = document.getElementById("45-deg-dark-jean-pattern");
-    const darkBgPattern = ctx.createPattern(darkBg, "repeat");
+    const darkBgPattern = ctx.createPattern(
+        document.getElementById(
+            "45-deg-dark-jean-pattern"
+        ) as HTMLImageElement,
+        "repeat"
+    );
 
-    const textBg = document.getElementById("pink-dust-pattern");
-    const textBgPattern = ctx.createPattern(textBg, "repeat");
+    const textBgPattern = ctx.createPattern(
+        document.getElementById(
+            "pink-dust-pattern"
+        ) as HTMLImageElement,
+        "repeat"
+    );
 
-    const buttonBg = document.getElementById("grey-linen-pattern");
-    const buttonBgPattern = ctx.createPattern(buttonBg, "repeat");
+    const buttonBgPattern = ctx.createPattern(
+        document.getElementById(
+            "grey-linen-pattern"
+        ) as HTMLImageElement,
+        "repeat"
+    );
 
     // Generating button data.
     const playCallback = Main.getTransition(
@@ -28,7 +38,7 @@ Main.mainMenu = (canvas, ctx) => {
         eventListeners
     );
 
-    const buttons =
+    const buttons: Button[] =
         [ [rect(150, 550, 325, 100), 7, "play",  playCallback]
         , [rect(805, 550, 325, 100), 7, "about", aboutCallback]
         ];
@@ -36,10 +46,10 @@ Main.mainMenu = (canvas, ctx) => {
         new Float64Array(buttons.length * 4)
             .map(() => Math.PI * Math.random());
 
-    const mouseState = registerMouse(canvas, eventListeners, buttons);
+    const mouseState = new MouseState(canvas, eventListeners, buttons);
 
     // Main menu loop.
-    function mainMenu(displacement, dt) {
+    function mainMenu(displacement: V2, dt: number) {
         // Fill in the background.
         ctx.save();
         ctx.fillStyle = darkBgPattern;
@@ -68,13 +78,13 @@ Main.mainMenu = (canvas, ctx) => {
         );
 
         // Draw mouse trail.
-        drawMouseTrail(ctx, mouseState);
+        mouseState.drawMouseTrail(ctx);
 
         // Draw mouse movement particle effects.
-        drawAndUpdateMouseSparks(ctx, mouseState, dt);
+        mouseState.drawAndUpdateMouseSparks(ctx, dt);
 
         // Draw mouse click effect.
-        drawClickEffect(ctx, mouseState, dt);
+        mouseState.drawClickEffect(ctx, dt);
     }
 
     return mainMenu;

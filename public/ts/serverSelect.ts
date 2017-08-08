@@ -1,18 +1,28 @@
-Main.serverSelect = (canvas, ctx, ws) => {
-    "use strict";
-
+Main.loops.serverSelect = (canvas, ctx, ws) => {
     // Holding a local copy of event listeners so they can be unloaded.
     const eventListeners = new EventRegistrar();
 
     // Initialize patterns.
-    const darkBg = document.getElementById("45-deg-dark-jean-pattern");
-    const darkBgPattern = ctx.createPattern(darkBg, "repeat");
+    const darkBgPattern = ctx.createPattern(
+        document.getElementById(
+            "45-deg-dark-jean-pattern"
+        ) as HTMLImageElement,
+        "repeat"
+    );
 
-    const textBg = document.getElementById("pink-dust-pattern");
-    const textBgPattern = ctx.createPattern(textBg, "repeat");
+    const textBgPattern = ctx.createPattern(
+        document.getElementById(
+            "pink-dust-pattern"
+        ) as HTMLImageElement,
+        "repeat"
+    );
 
-    const buttonBg = document.getElementById("grey-linen-pattern");
-    const buttonBgPattern = ctx.createPattern(buttonBg, "repeat");
+    const buttonBgPattern = ctx.createPattern(
+        document.getElementById(
+            "grey-linen-pattern"
+        ) as HTMLImageElement,
+        "repeat"
+    );
 
     // Generating button data.
     let doRequestServerList = true;
@@ -40,19 +50,19 @@ Main.serverSelect = (canvas, ctx, ws) => {
         _mainCallback();
     };
 
-    const buttons =
+    const buttons: Button[] =
         [ [rect(150, 550, 325, 100), 7, "new",  newGameCallback]
         , [rect(805, 550, 325, 100), 7, "main", mainCallback]
         ];
 
-    let serverListRects = [];
+    let serverListRects: [string, Rect][] = [];
 
     const screwAngles =
         new Float64Array(buttons.length * 4)
             .map(() => Math.PI * Math.random());
 
     // Resistering mouse state.
-    const mouseState = registerMouse(canvas, eventListeners, buttons);
+    const mouseState = new MouseState(canvas, eventListeners, buttons);
 
     // Loading wheel state.
     let loadingWheelAngle = 0;
@@ -61,35 +71,14 @@ Main.serverSelect = (canvas, ctx, ws) => {
     const loadingWheelPseudoRadius = 256;
     const loadingWheelTrailLen = 12;
     const loadingWheelTrailTheta = 0.1;
-    function squareAtAngle(c, s, theta) {
-        if (theta >= 7 * Math.PI / 4 || theta < Math.PI / 4) {
-            // Right
-            const x = c.x + s / 2;
-            const y = c.y + s * Math.tan(theta) / 2;
-            return v2(x, y);
-        }
-        if (theta >= Math.PI / 4 && theta < 3 * Math.PI / 4) {
-            // Top
-            const x = c.x + s * Math.tan(Math.PI / 2 - theta) / 2;
-            const y = c.y + s / 2;
-            return v2(x, y);
-        }
-        if (theta >= 3 * Math.PI / 4 && theta < 5 * Math.PI / 4) {
-            // Left
-            const x = c.x - s / 2;
-            const y = c.y + s * Math.tan(Math.PI - theta) / 2;
-            return v2(x, y);
-        }
-        // Bottom
-        const x = c.x - s * Math.tan(3 * Math.PI / 2 - theta) / 2;
-        const y = c.y - s / 2;
-        return v2(x, y);
-    }
+
+    // Alert text for errors.
+    let alertText = [];
 
     // Requesting a list of servers and updating periodically.
-    let serverList = null;
+    let serverList: [string, number][] | null = null;
     const requestServerListPacket = new Uint8Array([0x00]).buffer;
-    const recvServerListCallback = data => {
+    const recvServerListCallback = (data: MessageEvent) => {
         const bytes = new Uint8Array(data.data);
         if (bytes[0] !== 0x00) {
             console.log(
@@ -97,7 +86,7 @@ Main.serverSelect = (canvas, ctx, ws) => {
             );
             return;
         }
-        const newServerList = [];
+        const newServerList: [string, number][] = [];
         let newServer = "";
         let j = -1;
         for (let i = 1; i < bytes.length; ++i) {
@@ -119,13 +108,13 @@ Main.serverSelect = (canvas, ctx, ws) => {
             Main.wsRecvCallback = recvServerListCallback;
             ws.send(requestServerListPacket);
             window.setTimeout(requestServerList, 5000);
-            console.log("requested server list.");
+            console.log("Requested server list.");
         }
     }
     requestServerList();
 
     // Add functionality to server list items.
-    const joinGameConfirmCallback = data => {
+    const joinGameConfirmCallback = (data: MessageEvent) => {
         const bytes = new Uint8Array(data.data);
         if (bytes[0] !== 0x01) {
             console.log(
@@ -161,7 +150,7 @@ Main.serverSelect = (canvas, ctx, ws) => {
         }
     };
 
-    const _clickServerName = e => {
+    const _clickServerName = (e: MouseEvent) => {
         const boundingRect = canvas.getBoundingClientRect();
         const clickPos = v2(
             e.clientX - boundingRect.left,
@@ -205,7 +194,7 @@ Main.serverSelect = (canvas, ctx, ws) => {
     eventListeners.register(canvas, "click", _clickServerName);
 
     // Server select menu main loop.
-    function serverSelect(displacement, dt) {
+    function serverSelect(displacement: V2, dt: number) {
         // Fill in the background.
         ctx.save();
         ctx.fillStyle = darkBgPattern;
@@ -252,7 +241,7 @@ Main.serverSelect = (canvas, ctx, ws) => {
             ctx.font = `${fontHeight}px 'Noto Sans', sans-serif`;
             ctx.textAlign = "center";
             ctx.fillStyle = "#777";
-            const newServerListRects = [];
+            const newServerListRects: [string, Rect][] = [];
             if (serverList.length > 0) {
                 serverList.forEach(([serverName, playerCount], i) => {
                     const text =
@@ -314,13 +303,13 @@ Main.serverSelect = (canvas, ctx, ws) => {
         );
 
         // Draw mouse trail.
-        drawMouseTrail(ctx, mouseState);
+        mouseState.drawMouseTrail(ctx);
 
         // Draw mouse movement particle effects.
-        drawAndUpdateMouseSparks(ctx, mouseState, dt);
+        mouseState.drawAndUpdateMouseSparks(ctx, dt);
 
         // Draw mouse click effect.
-        drawClickEffect(ctx, mouseState, dt);
+        mouseState.drawClickEffect(ctx, dt);
     }
 
     return serverSelect;

@@ -1,21 +1,35 @@
-Main.game = (canvas, ctx, ws) => {
-    "use strict";
-
+Main.loops.game = (canvas, ctx, ws) => {
     // Holding a local copy of event listeners so they can be unloaded.
     const eventListeners = new EventRegistrar();
 
     // Initialize patterns.
-    const darkBg = document.getElementById("45-deg-dark-jean-pattern");
-    const darkBgPattern = ctx.createPattern(darkBg, "repeat");
+    const darkBgPattern = ctx.createPattern(
+        document.getElementById(
+            "45-deg-dark-jean-pattern"
+        ) as HTMLImageElement,
+        "repeat"
+    );
 
-    const textBg = document.getElementById("pink-dust-pattern");
-    const textBgPattern = ctx.createPattern(textBg, "repeat");
+    const textBgPattern = ctx.createPattern(
+        document.getElementById(
+            "pink-dust-pattern"
+        ) as HTMLImageElement,
+        "repeat"
+    );
 
-    const buttonBg = document.getElementById("grey-linen-pattern");
-    const buttonBgPattern = ctx.createPattern(buttonBg, "repeat");
+    const buttonBgPattern = ctx.createPattern(
+        document.getElementById(
+            "grey-linen-pattern"
+        ) as HTMLImageElement,
+        "repeat"
+    );
 
-    const naturalBlack = document.getElementById("natural-black-pattern");
-    const naturalBlackPattern = ctx.createPattern(naturalBlack, "repeat");
+    const naturalBlackPattern = ctx.createPattern(
+        document.getElementById(
+            "natural-black-pattern"
+        ) as HTMLImageElement,
+        "repeat"
+    );
 
     // Game state.
     const color = getRand([
@@ -39,18 +53,17 @@ Main.game = (canvas, ctx, ws) => {
         color
     );
 
-    let keypressLog = [];
-    let mouseLog = [];
+    let keypressLog: [number, string, boolean][] = [];
+    let mouseLog: [number, number | V2][] = [];
     let movementSendCounter = 0;
     let mouseIdCounter = 0;
-    const waitingForConfirmation = new Map();
+    const waitingForConfirmation: Map<number, [V2, Map<number, V2>]> =
+        new Map();
 
-    let projectiles = new Map();
-    let lastMouseDown;
+    let projectiles: Map<number, Projectile> = new Map();
+    let lastMouseDown: number | undefined = undefined;
     const maxHoldTime = 2000; // milliseconds
     const minHoldTime = 200;
-    Main.maxProjVel = 2.5;
-    Main.maxProjAngVel = 0.02;
 
     // Sending initial game-start "hello".
     const hereIsMyGameInfoBytes = [0x02];
@@ -85,7 +98,7 @@ Main.game = (canvas, ctx, ws) => {
     const mainPromptCallback  = () => promptOpen = true;
     const closePromptCallback = () => promptOpen = false;
 
-    const _modalClick = e => {
+    const _modalClick = (e: MouseEvent) => {
         if (!promptOpen) {
             return;
         }
@@ -106,7 +119,7 @@ Main.game = (canvas, ctx, ws) => {
     canvas.addEventListener("click", _modalClick);
     eventListeners.register(canvas, "click", _modalClick);
 
-    const buttons =
+    const buttons: Button[] =
         [ [ rect(1155, 660, 114, 50)
           , 5
           , "main"
@@ -132,7 +145,7 @@ Main.game = (canvas, ctx, ws) => {
     const usernameFontSize = 16; // pixels
 
     // Resistering mouse state.
-    const mouseState = registerMouse(canvas, eventListeners, buttons);
+    const mouseState = new MouseState(canvas, eventListeners, buttons);
 
     // Player control buttons.
     const controllerKeys = new Map([
@@ -157,7 +170,7 @@ Main.game = (canvas, ctx, ws) => {
     );
 
     // Player controls.
-    const _keydown = e => {
+    const _keydown = (e: KeyboardEvent) => {
         if (!chatHandler.active) {
             const now = window.performance.now();
             const key = e.key.toLowerCase();
@@ -169,7 +182,7 @@ Main.game = (canvas, ctx, ws) => {
     window.addEventListener("keydown", _keydown);
     eventListeners.register(window, "keydown", _keydown);
 
-    const _keyup = e => {
+    const _keyup = (e: KeyboardEvent) => {
         if (!chatHandler.active) {
             const now = window.performance.now();
             const key = e.key.toLowerCase();
@@ -181,7 +194,7 @@ Main.game = (canvas, ctx, ws) => {
     window.addEventListener("keyup", _keyup);
     eventListeners.register(window, "keyup", _keyup);
 
-    const _mousedown = e => {
+    const _mousedown = (e: MouseEvent) => {
         const now = window.performance.now();
         if (e.button !== 0) {
             return;
@@ -193,9 +206,9 @@ Main.game = (canvas, ctx, ws) => {
     canvas.addEventListener("mousedown", _mousedown);
     eventListeners.register(canvas, "mousedown", _mousedown);
 
-    const _mouseup = e => {
+    const _mouseup = (e: MouseEvent) => {
         const now = window.performance.now();
-        if (e.button !== 0) {
+        if (e.button !== 0 || lastMouseDown === undefined) {
             return;
         }
         const mouseDt = now - lastMouseDown;
@@ -216,13 +229,15 @@ Main.game = (canvas, ctx, ws) => {
     eventListeners.register(canvas, "mouseup", _mouseup);
 
     // Info on other players.
-    const otherPlayers = new Map();
-    const otherProjectiles = new Map();
+    const otherPlayers: Map<string, Player> = new Map();
+    const otherProjectiles: Map<string, Map<number, Projectile>> = new Map();
     let recvCount = 0;
-    let lastRecv, recvDtAvg, lastRecvDt;
+    let lastRecv: number | undefined = undefined;
+    let recvDtAvg: number | undefined = undefined;
+    let lastRecvDt;
 
     // Extra drawing function for projectiles.
-    const drawProjectile = thePlayer => p => {
+    const drawProjectile = (thePlayer: Player) => (p: Projectile) => {
         ctx.save();
 
         ctx.strokeStyle = "#111";
@@ -233,14 +248,14 @@ Main.game = (canvas, ctx, ws) => {
             p.dust.forEach(([pos]) => {
                 ctx.beginPath();
                 ctx.moveTo(
-                    pos.x + p.dustRadius,
+                    pos.x + Projectile.dustRadius,
                     pos.y
                 );
                 for (let i = 1; i <= 6; ++i) { // Hexagonal
                     const theta = 2 * Math.PI * i / 6;
                     ctx.lineTo(
-                        pos.x + Math.cos(theta) * p.dustRadius,
-                        pos.y + Math.sin(theta) * p.dustRadius
+                        pos.x + Math.cos(theta) * Projectile.dustRadius,
+                        pos.y + Math.sin(theta) * Projectile.dustRadius
                     );
                 }
                 ctx.closePath();
@@ -352,7 +367,7 @@ Main.game = (canvas, ctx, ws) => {
                 offset++;
                 const projCount = view.getUint8(offset);
                 offset++;
-                const projs = new Map();
+                const projs: Map<number, Projectile> = new Map();
                 for (let i = 0; i < projCount; ++i) {
                     const id = view.getUint32(offset, true);
                     offset += 4;
@@ -393,8 +408,8 @@ Main.game = (canvas, ctx, ws) => {
                 );
                 */
                 if (isOtherPlayer) {
-                    if (otherPlayers.has(name)) {
-                        const otherPlayer = otherPlayers.get(name);
+                    const otherPlayer = otherPlayers.get(name);
+                    if (otherPlayer !== undefined) {
                         otherPlayer.pushPos(v2(px, py));
                         otherPlayer.pushVel(v2(vx, vy));
                         otherPlayer.color = `#${red}${green}${blue}`;
@@ -411,14 +426,15 @@ Main.game = (canvas, ctx, ws) => {
                         otherPlayers.set(name, otherPlayer);
                     }
 
-                    const thisPlayersProjs =
-                        otherProjectiles.has(name) ?
-                            otherProjectiles.get(name) :
+                    const thisPlayersProjs_ = otherProjectiles.get(name);
+                    const thisPlayersProjs: Map<number, Projectile> =
+                        thisPlayersProjs_ !== undefined ?
+                            thisPlayersProjs_ :
                             new Map();
                     /* jshint loopfunc: true */
                     projs.forEach((pj, id) => {
-                        if (thisPlayersProjs.has(id)) {
-                            const relevantProj = thisPlayersProjs.get(id);
+                        const relevantProj = thisPlayersProjs.get(id);
+                        if (relevantProj !== undefined) {
                             relevantProj.pos = pj.pos;
                             relevantProj.vel = pj.vel;
                             relevantProj.isBroken = pj.isBroken;
@@ -437,17 +453,19 @@ Main.game = (canvas, ctx, ws) => {
                         const diff = v2(px, py).sub(pos);
                         player.addPos(diff);
 
-                        /* jshint loopfunc: true */
                         pjClones.forEach((pjPos, id) => {
                             const relevantProj = projs.get(id);
                             if (relevantProj !== undefined) {
                                 const posDiff = relevantProj.pos.sub(pjPos);
-                                if (!posDiff.null() && projectiles.has(id)) {
-                                    projectiles.get(id).addPos(posDiff);
+                                const storedProj = projectiles.get(id);
+                                if (
+                                    !posDiff.null() &&
+                                    storedProj !== undefined
+                                ) {
+                                    storedProj.addPos(posDiff);
                                 }
                             }
                         });
-                        /* jshint loopfunc: false */
                     }
                     waitingForConfirmation.clearKeysUpTo(lastOrdinal);
                 }
@@ -469,7 +487,7 @@ Main.game = (canvas, ctx, ws) => {
     };
 
     // Game main loop.
-    function gameMainLoop(displacement, dt) {
+    function gameMainLoop(displacement: V2, dt: number) {
         // Fill in the background.
         ctx.save();
         ctx.fillStyle = darkBgPattern;
@@ -486,7 +504,7 @@ Main.game = (canvas, ctx, ws) => {
 
             // Draw cursor.
             chatHandler.incrementCursorTime(dt);
-            if (chatHandler.cursorTime > chatHandler.cursorPeriod / 2) {
+            if (chatHandler.cursorTime > ChatHandler.cursorPeriod / 2) {
                 const textWidth = ctx.measureText(chatHandler.text).width;
                 ctx.fillStyle = "rgba(212, 212, 212, 0.5)";
                 ctx.fillRect(
@@ -556,11 +574,12 @@ Main.game = (canvas, ctx, ws) => {
         // Spawn new projectiles.
         const mouseLogCopy = mouseLog;
         mouseLog = [];
-        let lastPress, lastClickId;
-        mouseLogCopy.forEach(([timestamp, clickPos]) => {
-            if (typeof clickPos === "number") {
+        let lastPress:   number | undefined = undefined;
+        let lastClickId: number | undefined = undefined;
+        mouseLogCopy.forEach(([timestamp, clickPosOrId]) => {
+            if (typeof clickPosOrId === "number") {
                 lastPress = timestamp;
-                lastClickId = clickPos;
+                lastClickId = clickPosOrId;
                 return;
             }
 
@@ -575,7 +594,7 @@ Main.game = (canvas, ctx, ws) => {
 
             const mouseDt = timestamp - lastPressCopy;
 
-            const dir = clickPos.sub(player.center()).normalize();
+            const dir = clickPosOrId.sub(player.center()).normalize();
             if (dir.null()) {
                 return;
             }
@@ -603,7 +622,7 @@ Main.game = (canvas, ctx, ws) => {
 
             player.addVel(dir.scalarMult(-ratio));
         });
-        if (lastPress !== undefined) {
+        if (lastPress !== undefined && lastClickId !== undefined) {
             mouseLog.unshift([lastPress, lastClickId]);
         }
 
@@ -625,7 +644,7 @@ Main.game = (canvas, ctx, ws) => {
                 if (thisDt > 0) {
                     /* jshint loopfunc: true */
                     const dir = pressed.foldl(
-                        (d, k) => d.add(controllerKeys.get(k)),
+                        (d, k) => d.add(controllerKeys.get(k) as V2),
                         V2.zero()
                     ).normalize();
                     /* jshint loopfunc: false */
@@ -648,9 +667,9 @@ Main.game = (canvas, ctx, ws) => {
         let leftoverDir = V2.zero();
         pressed.forEach(key => {
             keypressLog.unshift([now, key, true]);
-            leftoverDir = leftoverDir.add(controllerKeys.get(key));
+            leftoverDir = leftoverDir.add(controllerKeys.get(key) as V2);
         });
-        if (!leftoverDir.null()) {
+        if (!leftoverDir.null() && t_ !== undefined) {
             leftoverDir = leftoverDir.normalize();
             const thisDt = now - t_;
             const thisAccel =
@@ -726,7 +745,7 @@ Main.game = (canvas, ctx, ws) => {
         });
 
         // Update projectile positions.
-        const updateProj = p => {
+        const updateProj = (p: Projectile) => {
             p.update(dt);
 
             // Collision detection with arena bounds.
@@ -749,7 +768,7 @@ Main.game = (canvas, ctx, ws) => {
                 p.vel.x = -p.vel.x;
             }
             // Collision detection with players.
-            const projPlayerCollisionDetect = op => {
+            const projPlayerCollisionDetect = (op: Player) => {
                 if (
                     p.pos.y < op.pos.y           ||
                     p.pos.y > op.pos.y + op.side ||
@@ -794,16 +813,16 @@ Main.game = (canvas, ctx, ws) => {
             }
         };
         projectiles.forEach(updateProj);
-        projectiles.filter(p => !p.isDestroyed);
+        projectiles.filter((p: Projectile) => !p.isDestroyed);
         // Update foreign projectiles.
-        otherProjectiles.filter((pjs, name) => otherPlayers.has(name));
+        otherProjectiles.filter((pjs, name: string) => otherPlayers.has(name));
         otherProjectiles.forEach(pjs => {
             pjs.forEach(updateProj);
-            pjs.filter((id, p) => !p.isDestroyed);
+            pjs.filter((id, p: Projectile) => !p.isDestroyed);
         });
 
         // Saving calculated position to be confirmed by server later.
-        const projectilesClone = new Map();
+        const projectilesClone: Map<number, V2> = new Map();
         projectiles.forEach(({pos}, id) =>
             projectilesClone.set(id, pos)
         );
@@ -820,7 +839,7 @@ Main.game = (canvas, ctx, ws) => {
             keypressLogCopy.splice(0, keypressLogCopy.length - 0xFF);
         }
         const hereAreMyMovementsBytes = [0x03];
-        const pushByte = b => hereAreMyMovementsBytes.push(b);
+        const pushByte = (b: number) => hereAreMyMovementsBytes.push(b);
         Main.data.i32ToBytes(movementSendCounter).forEach(pushByte);
         movementSendCounter++;
         Main.data.f64ToBytes(now).forEach(pushByte);
@@ -828,7 +847,7 @@ Main.game = (canvas, ctx, ws) => {
         pushByte(keypressLogCopy.length);
         keypressLogCopy.forEach(([t, key, down]) => {
             Main.data.f64ToBytes(t).forEach(pushByte);
-            pushByte(controllerKeyIndices.get(key));
+            pushByte(controllerKeyIndices.get(key) as number);
             if (down) {
                 pushByte(0x01);
             } else {
@@ -836,15 +855,14 @@ Main.game = (canvas, ctx, ws) => {
             }
         });
         //pushByte(mouseLogCopy.length);
-        mouseLogCopy.forEach(([timestamp, clickPos]) => {
-            const isDown = typeof clickPos === "number";
-            pushByte(isDown ? 0 : 1);
+        mouseLogCopy.forEach(([timestamp, clickPosOrId]) => {
+            pushByte(typeof clickPosOrId === "number" ? 0 : 1);
             Main.data.f64ToBytes(timestamp).forEach(pushByte);
-            if (isDown) {
-                Main.data.i32ToBytes(clickPos).forEach(pushByte);
+            if (typeof clickPosOrId === "number") {
+                Main.data.i32ToBytes(clickPosOrId).forEach(pushByte);
             } else {
-                Main.data.f64ToBytes(clickPos.x).forEach(pushByte);
-                Main.data.f64ToBytes(clickPos.y).forEach(pushByte);
+                Main.data.f64ToBytes(clickPosOrId.x).forEach(pushByte);
+                Main.data.f64ToBytes(clickPosOrId.y).forEach(pushByte);
             }
         });
         ws.send(new Uint8Array(hereAreMyMovementsBytes).buffer);
@@ -956,7 +974,7 @@ Main.game = (canvas, ctx, ws) => {
                 return;
             }
 
-            const split = chatHandler.splitMsg(msg);
+            const split = ChatHandler.splitMsg(msg);
             split.forEach((line, i) => ctx.fillText(
                 line,
                 textPos.x,
@@ -967,13 +985,13 @@ Main.game = (canvas, ctx, ws) => {
         ctx.restore();
 
         // Draw mouse trail.
-        drawMouseTrail(ctx, mouseState);
+        mouseState.drawMouseTrail(ctx);
 
         // Draw mouse movement particle effects.
-        drawAndUpdateMouseSparks(ctx, mouseState, dt);
+        mouseState.drawAndUpdateMouseSparks(ctx, dt);
 
         // Draw mouse click effect.
-        drawClickEffect(ctx, mouseState, dt);
+        mouseState.drawClickEffect(ctx, dt);
     }
 
     return gameMainLoop;

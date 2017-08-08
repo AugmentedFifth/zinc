@@ -1,29 +1,59 @@
-const Main = {
-    doLoop: true,
-    currentLoops: new Map([["mainMenu", V2.zero()]]),
-    wsRecvCallback: null,
-    lastLoop: 0,
-    data: new Data(),
-    width: 1280,
-    height: 720,
-    canvasRect: rect(0, 0, 1280, 720),
-    maxPlayerCount: 2,
-    clickAnimDur: 250, // milliseconds
-    crosshairQuad: [v2(15, 0), v2(-15, 0), v2(0, 15), v2(0, -15)],
-    sparkGravity: 0.005,
-    transitionTime: 697.2, // milliseconds
-    isInCanvas: (arg1, arg2) => {
-        "use strict";
+class LoopIndexer {
+    [index: string]: ( canvas: HTMLCanvasElement
+                     , ctx:    CanvasRenderingContext2D
+                     , ws:     WebSocket
+                     ) => (displacement: V2, dt: number) => void;
+}
+
+class Main {
+    static doLoop: boolean = true;
+    static currentLoops: Map<string, V2> = new Map([["mainMenu", V2.zero()]]);
+    static wsRecvCallback: ((data: MessageEvent) => any) | null = null;
+    static lastLoop: number = 0;
+
+    static currGame: string;
+    static serverToJoinName: string;
+    static username: string;
+
+    static uuid: any;
+
+    static readonly data: Data = new Data();
+
+    static readonly width:  number = 1280;
+    static readonly height: number = 720;
+    static readonly canvasRect: Rect = rect(0, 0, 1280, 720);
+
+    static readonly maxPlayerCount: number = 2;
+
+    static readonly clickAnimDur: number = 250; // milliseconds
+    static readonly crosshairQuad: [V2, V2, V2, V2] = [ v2(15,  0)
+                                                      , v2(-15, 0)
+                                                      , v2(0,  15)
+                                                      , v2(0, -15)
+                                                      ];
+    static readonly sparkGravity: number = 0.005;
+
+    static readonly transitionTime: number = 697.2; // milliseconds
+
+    static readonly maxProjVel:    number = 2.5;
+    static readonly maxProjAngVel: number = 0.02;
+
+    static loops: LoopIndexer = new LoopIndexer();
+
+    static isInCanvas(arg1: number | V2, arg2?: number): boolean {
         return Main.canvasRect.contains(arg1, arg2);
-    },
-    noSupportFailure: (htmlName, plainName) => {
-        "use strict";
+    }
+
+    static noSupportFailure(htmlName: string, plainName: string): never {
         const fallback =
             "<p>Uh oh! It looks like your browser doesn't support " +
                 `<code>${htmlName}</code>. ` +
                 '<a href="https://www.mozilla.org/en-US/firefox/new/">' +
                 "You can download Firefox for free here.</a></p>";
-        document.getElementById("body").innerHTML = fallback;
+        const body = document.getElementById("body");
+        if (body !== null) {
+            body.innerHTML = fallback;
+        }
 
         const noSupportMsg =
             "Uh oh! It looks like your browser doesn't support " +
@@ -31,19 +61,25 @@ const Main = {
                 "https://www.mozilla.org/en-US/firefox/new/";
         throw new Error(noSupportMsg);
     }
-};
+
+    static init: () => void;
+
+    static getTransition: ( thisName:       string
+                          , destName:       string
+                          , dir:            Direction
+                          , eventListeners: EventRegistrar
+                          ) => (t?: number) => void;
+}
 
 Main.init = () => {
-    "use strict";
-
     // Disabling right mouse button to make gameplay less error-prone.
     document.addEventListener("contextmenu", e => e.preventDefault(), false);
 
     // Initializing `canvas` context.
-    const canvas = document.getElementById("canvas");
+    const canvas = document.getElementById("canvas") as HTMLCanvasElement;
     const ctx =
         canvas.getContext ?
-            canvas.getContext("2d") :
+            canvas.getContext("2d") as CanvasRenderingContext2D :
             Main.noSupportFailure("&lt;canvas&gt;", "<canvas>");
 
     // Initializing `WebSocket`, connecting to and getting UID from server.
@@ -87,32 +123,27 @@ Main.init = () => {
         }
     });
 
-    ws.addEventListener("error", err => {
-        console.log("WebSocket error:", err);
-        console.log(err.target.url, err.target.readyState);
-    });
+    ws.addEventListener("error", err => console.log("WebSocket error:", err));
 
     /**
      * Function for making new transition callbacks.
-     * Values for `dir`:
-     *
-     * - 0 -> Go to a page up.
-     * - 1 -> Right.
-     * - 2 -> Down.
-     * - 3 -> Left.
-     * - _ -> Runtime error.
      *
      * @param {string} thisName - The name of the page to be transitioned from,
      *                            as registered in `Main.currentLoops`.
      * @param {string} destName - The name of the page to be transitioned to.
-     * @param {number} dir - Direction of the page to transition to, relative
-     *                       to the current page.
+     * @param {Direction} dir - Direction of the page to transition to,
+     *                          relative to the current page.
      * @param {EventRegistrar} eventListeners - An `EventRegistrar` of event
      *                                          listeners registered by the
      *                                          current page.
-     * @return {function} - The new callback.
+     * @return {(t?: number) => void} - The new callback.
      */
-    Main.getTransition = function(thisName, destName, dir, eventListeners) {
+    Main.getTransition = function(
+        thisName: string,
+        destName: string,
+        dir: Direction,
+        eventListeners: EventRegistrar
+    ): (t?: number) => void {
         if (![0, 1, 2, 3].includes(dir)) {
             throw new Error(
                 "Main.getTransition(): Expected dir to be in [0, 1, 2, 3]. " +
@@ -122,7 +153,7 @@ Main.init = () => {
 
         const relevantDim = dir === 0 || dir === 2 ? Main.height : Main.width;
 
-        function transitionCallback(t=0) {
+        function transitionCallback(t: number = 0): void {
             if (t === 0) {
                 eventListeners.forEach(
                     (target, type, fn) => target.removeEventListener(type, fn)
@@ -142,44 +173,44 @@ Main.init = () => {
                     Main.currentLoops.set(destName, V2.zero());
                 } else {
                     if (dir === 0) {
-                        Main.currentLoops.get(thisName).y = disp;
-                        Main.currentLoops.get(destName).y =
+                        (Main.currentLoops.get(thisName) as V2).y = disp;
+                        (Main.currentLoops.get(destName) as V2).y =
                             -relevantDim + disp + 1;
                     } else if (dir === 1) {
-                        Main.currentLoops.get(thisName).x = -disp;
-                        Main.currentLoops.get(destName).x =
+                        (Main.currentLoops.get(thisName) as V2).x = -disp;
+                        (Main.currentLoops.get(destName) as V2).x =
                             relevantDim - disp - 1;
                     } else if (dir === 2) {
-                        Main.currentLoops.get(thisName).y = -disp;
-                        Main.currentLoops.get(destName).y =
+                        (Main.currentLoops.get(thisName) as V2).y = -disp;
+                        (Main.currentLoops.get(destName) as V2).y =
                             relevantDim - disp - 1;
                     } else if (dir === 3) {
-                        Main.currentLoops.get(thisName).x = disp;
-                        Main.currentLoops.get(destName).x =
+                        (Main.currentLoops.get(thisName) as V2).x = disp;
+                        (Main.currentLoops.get(destName) as V2).x =
                             -relevantDim + disp + 1;
                     }
                 }
             } else {
                 if (dir === 0) {
-                    Main.currentLoops.get(thisName).y = disp;
+                    (Main.currentLoops.get(thisName) as V2).y = disp;
                     Main.currentLoops.set(
                         destName,
                         v2(0, -relevantDim + disp)
                     );
                 } else if (dir === 1) {
-                    Main.currentLoops.get(thisName).x = -disp;
+                    (Main.currentLoops.get(thisName) as V2).x = -disp;
                     Main.currentLoops.set(
                         destName,
                         v2(relevantDim - disp, 0)
                     );
                 } else if (dir === 2) {
-                    Main.currentLoops.get(thisName).y = -disp;
+                    (Main.currentLoops.get(thisName) as V2).y = -disp;
                     Main.currentLoops.set(
                         destName,
                         v2(0, relevantDim - disp)
                     );
                 } else if (dir === 3) {
-                    Main.currentLoops.get(thisName).x = disp;
+                    (Main.currentLoops.get(thisName) as V2).x = disp;
                     Main.currentLoops.set(
                         destName,
                         v2(-relevantDim + disp, 0)
@@ -197,7 +228,7 @@ Main.init = () => {
 
     const registeredLoops = new Map();
 
-    function draw(timestamp) {
+    function draw(timestamp: number): void {
         // Request next animation frame right up front.
         if (Main.doLoop) {
             window.requestAnimationFrame(draw);
@@ -225,7 +256,7 @@ Main.init = () => {
             if (registeredLoops.has(loopId)) {
                 registeredLoops.get(loopId)(displacement, dt);
             } else {
-                const closuredLoop = Main[loopId](canvas, ctx, ws);
+                const closuredLoop = Main.loops[loopId](canvas, ctx, ws);
                 registeredLoops.set(loopId, closuredLoop);
                 closuredLoop(displacement, dt);
             }

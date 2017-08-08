@@ -1,23 +1,15 @@
-function drawButtons(ctx,
-                     mouseState,
-                     buttons,
-                     buttonBgPattern,
-                     textBgPattern,
-                     screwAngles,
-                     fontSize,
-                     outline) {
-    "use strict";
-
-    if (fontSize === undefined) {
-        fontSize = 64;
-    }
-    if (outline === undefined) {
-        outline = true;
-    }
-
+function drawButtons(
+    ctx:             CanvasRenderingContext2D,
+    mouseState:      AbstractMouseState,
+    buttons:         Button[],
+    buttonBgPattern: FillStyle,
+    textBgPattern:   FillStyle,
+    screwAngles:     Float64Array,
+    fontSize:        number  = 64,
+    outline:         boolean = true
+): void {
     ctx.save();
 
-    const newestMouseLoc = mouseState.mouseLocs.get();
     buttons.forEach(([box, screwRadius, text], i) => {
         // Main button body.
         ctx.fillStyle = buttonBgPattern;
@@ -27,7 +19,10 @@ function drawButtons(ctx,
         ctx.lineWidth = 4;
         ctx.strokeStyle = "#202020";
         ctx.strokeRect(box.x, box.y, box.width, box.height);
-        if (newestMouseLoc && box.contains(newestMouseLoc)) {
+        if (
+            mouseState.newestMouseLoc &&
+            box.contains(mouseState.newestMouseLoc)
+        ) {
             ctx.globalCompositeOperation = "darken";
             ctx.fillStyle = "#fff";
             ctx.fillRect(box.x, box.y, box.width, box.height);
