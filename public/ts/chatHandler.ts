@@ -57,7 +57,11 @@ class ChatHandler {
         };
 
         window.addEventListener("keydown", _chatKeydown);
-        eventListeners.register(window, "keydown", _chatKeydown);
+        eventListeners.register(
+            window,
+            "keydown",
+            _chatKeydown as EventListener
+        );
     }
 
     public incrementCursorTime(dt: number): void {

@@ -92,7 +92,7 @@ Main.init = () => {
         Main.noSupportFailure("WebSocket", "WebSocket");
     }
 
-    const ws = new WebSocket("ws://50.53.124.21:3000/ws");
+    const ws = new WebSocket("ws://127.0.0.1:3000/ws");
     ws.binaryType = "arraybuffer";
     const hello = new Uint8Array(
         [0x05, 0x58, 0xE6, 0x39, 0x0A, 0xC4, 0x13, 0x24]

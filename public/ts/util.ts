@@ -936,6 +936,8 @@ class Rect {
             this.y = arg1.y;
             this.width = arg1.width;
             this.height = arg1.height;
+        } else {
+            throw "Invalid arguments to `Rect` constructor";
         }
     }
 

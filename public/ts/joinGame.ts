@@ -150,7 +150,7 @@ Main.loops.joinGame = (canvas, ctx, ws) => {
         }
     };
     canvas.addEventListener("click", _formClick);
-    eventListeners.register(canvas, "click", _formClick);
+    eventListeners.register(canvas, "click", _formClick as EventListener);
 
     const _formKeydown = (e: KeyboardEvent) => {
         const keydownedFormIx = formBoxes.findIndex(fb => fb[2]);
@@ -168,7 +168,7 @@ Main.loops.joinGame = (canvas, ctx, ws) => {
         }
     };
     window.addEventListener("keydown", _formKeydown);
-    eventListeners.register(window, "keydown", _formKeydown);
+    eventListeners.register(window, "keydown", _formKeydown as EventListener);
 
     // Resistering mouse state.
     const mouseState = new MouseState(canvas, eventListeners, buttons);

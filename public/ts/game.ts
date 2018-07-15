@@ -117,7 +117,7 @@ Main.loops.game = (canvas, ctx, ws) => {
         }
     };
     canvas.addEventListener("click", _modalClick);
-    eventListeners.register(canvas, "click", _modalClick);
+    eventListeners.register(canvas, "click", _modalClick as EventListener);
 
     const buttons: Button[] =
         [ [ rect(1155, 660, 114, 50)
@@ -180,7 +180,7 @@ Main.loops.game = (canvas, ctx, ws) => {
         }
     };
     window.addEventListener("keydown", _keydown);
-    eventListeners.register(window, "keydown", _keydown);
+    eventListeners.register(window, "keydown", _keydown as EventListener);
 
     const _keyup = (e: KeyboardEvent) => {
         if (!chatHandler.active) {
@@ -192,7 +192,7 @@ Main.loops.game = (canvas, ctx, ws) => {
         }
     };
     window.addEventListener("keyup", _keyup);
-    eventListeners.register(window, "keyup", _keyup);
+    eventListeners.register(window, "keyup", _keyup as EventListener);
 
     const _mousedown = (e: MouseEvent) => {
         const now = window.performance.now();
@@ -204,7 +204,7 @@ Main.loops.game = (canvas, ctx, ws) => {
         mouseIdCounter++;
     };
     canvas.addEventListener("mousedown", _mousedown);
-    eventListeners.register(canvas, "mousedown", _mousedown);
+    eventListeners.register(canvas, "mousedown", _mousedown as EventListener);
 
     const _mouseup = (e: MouseEvent) => {
         const now = window.performance.now();
@@ -226,7 +226,7 @@ Main.loops.game = (canvas, ctx, ws) => {
         mouseLog.push([now, clickPos]);
     };
     canvas.addEventListener("mouseup", _mouseup);
-    eventListeners.register(canvas, "mouseup", _mouseup);
+    eventListeners.register(canvas, "mouseup", _mouseup as EventListener);
 
     // Info on other players.
     const otherPlayers: Map<string, Player> = new Map();

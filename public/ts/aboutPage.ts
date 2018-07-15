@@ -36,7 +36,9 @@ Main.loops.aboutPage = (canvas, ctx) => {
             "https://www.github.com/AugmentedFifth/zinc",
             "_blank"
         );
-        newTab.focus();
+        if (newTab) {
+            newTab.focus();
+        }
     };
 
     const buttons: Button[] =

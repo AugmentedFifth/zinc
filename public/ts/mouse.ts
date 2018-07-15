@@ -31,7 +31,7 @@ abstract class AbstractMouseState {
             }
         };
         canvas.addEventListener("click", _click);
-        eventListeners.register(canvas, "click", _click);
+        eventListeners.register(canvas, "click", _click as EventListener);
     }
 
     public drawClickEffect(ctx: CanvasRenderingContext2D, dt: number): void {
@@ -93,7 +93,7 @@ class MouseState extends AbstractMouseState {
             this.newestMouseLoc = mouseLoc;
         };
         canvas.addEventListener("mousemove", _mousemove);
-        eventListeners.register(canvas, "mousemove", _mousemove);
+        eventListeners.register(canvas, "mousemove", _mousemove as EventListener);
 
         const _mouseenter = () => this.mouseLocs.clear();
         canvas.addEventListener("mouseenter", _mouseenter);
@@ -203,6 +203,6 @@ class MouseStateNoTrail extends AbstractMouseState {
             );
         };
         canvas.addEventListener("mousemove", _mousemove);
-        eventListeners.register(canvas, "mousemove", _mousemove);
+        eventListeners.register(canvas, "mousemove", _mousemove as EventListener);
     }
 }

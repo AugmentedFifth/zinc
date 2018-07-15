@@ -191,7 +191,7 @@ Main.loops.serverSelect = (canvas, ctx, ws) => {
         }
     };
     canvas.addEventListener("click", _clickServerName);
-    eventListeners.register(canvas, "click", _clickServerName);
+    eventListeners.register(canvas, "click", _clickServerName as EventListener);
 
     // Server select menu main loop.
     function serverSelect(displacement: V2, dt: number): void {
